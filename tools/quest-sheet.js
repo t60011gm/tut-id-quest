@@ -23,7 +23,7 @@ w();
 w('> 本檔由 `data/quests.js` 自動產生，請勿直接修改。修正題目請改 `data/quests.js`，再執行 `node tools/quest-sheet.js`。');
 w('> 題目依一般專業常識撰寫，請各位老師審閱自己的題目，有需要修正的地方直接標註即可。');
 w();
-w(`第一階段收集數量：一般模式 ${QUESTS.settings.count} 個、快速模式 ${QUESTS.settings.quickCount} 個。`);
+w(`第一階段採集戰要取得的道具數：一般模式 ${QUESTS.settings.count} 個、快速模式 ${QUESTS.settings.quickCount} 個。可選簡易版（被打到掉道具）或正常版（5 格體力，倒下重來）。`);
 w();
 
 const games = {
@@ -156,11 +156,13 @@ for (const region of WORLD.regions) {
     w();
     w(`徽章：**${q.badge}**`);
     w();
-    w('#### 第一階段：採集');
+    w(`#### 第一階段：採集戰「${q.stage1.game.title}」`);
     w();
     list([
+      `老師給的道具：${q.stage1.game.tool}（${q.stage1.game.toolDesc}）`,
+      `玩法：${q.stage1.game.rules}`,
       `小怪：${q.stage1.monster.name}（${q.stage1.monster.desc}）`,
-      `道具：${q.stage1.item.name}（${q.stage1.item.desc}）`,
+      `要取得的道具：${q.stage1.item.name}（${q.stage1.item.desc}）`,
       `接任務：「${q.stage1.lines.accept}」`,
       `提示：「${q.stage1.lines.hint}」`,
       `完成：「${q.stage1.lines.done}」`

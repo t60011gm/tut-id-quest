@@ -9,7 +9,8 @@
 - `index.html`：介面骨架；Three.js 0.170 以 importmap 從 jsDelivr 載入。
 - `data/faculty.js`：`window.WORLD`，含 `regions`（6 個區域）與 `faculty`（12 位研究所導師：專任 8 位、兼任 4 位，兼任標 `adjunct: true`）。**內容修改只改這裡。**
 - `data/quests.js`：`window.QUESTS`，12 位導師的兩階段任務（採集任務、「○○老師的試煉」小遊戲）的文字、題目、答案與知識小卡。題目改這裡，再執行 `node tools/quest-sheet.js` 重新產生審閱用的 `docs/quest-answers.md`（不要直接改 md）。小遊戲的專業內容要請老師審閱。
-- `js/quests.js`：任務系統（`initQuests(api)`，在 `mergeStatic()` 之後建立）。進度存 localStorage `tutIdQuest.quests.v1`，每位導師 stage 0 未接／1 採集中／2 待試煉／3 已通過。採集場小怪（`SHAPES`）、淨化小遊戲 `#purify`、試煉視窗 `#trial`、導師卡任務區塊、名牌任務記號、左上任務追蹤 `#qtrack`、圖鑑「任務與徽章」分頁與快速模式都在這裡。小遊戲用 `registerTrial(類型, fn)` 註冊，未註冊的顯示「製作中」；網址加 `?dev` 會出現「直接通過」測試鈕。`state.busy` 時角色不能動，`state.paused`（試煉）與導師卡開著時暫停 3D 渲染。
+- `js/quests.js`：任務系統（`initQuests(api)`，在 `mergeStatic()` 之後建立）。進度存 localStorage `tutIdQuest.quests.v1`，每位導師 stage 0 未接／1 採集中／2 待試煉／3 已通過。採集場閒晃小怪（`SHAPES`）、採集戰流程（選難度、2D 小視窗、3D 採集場、結果）、試煉視窗 `#trial`、導師卡任務區塊、名牌任務記號、左上任務追蹤 `#qtrack`、圖鑑「任務與徽章」分頁與快速模式都在這裡。小遊戲用 `registerTrial(類型, fn)` 註冊，未註冊的顯示「製作中」；網址加 `?dev` 會出現「直接通過」測試鈕。`state.busy` 時角色不能動，`state.paused`（試煉）與導師卡開著時暫停 3D 渲染。
+- `js/fight.js`：第一階段「採集戰」動作小遊戲。`createArena()` 是場地引擎（場地座標原點在採集場中心、半徑 `ARENA_R`），`GAMES` 有 12 個玩法（link、guard、denoise、nodes、sensor、recycle、trail、whack、escort、coins、paint、frame，對應 `data/quests.js` 各老師 `stage1.game.type`），每個玩法有 `setup`／`update`／`action`／`bot`（自動玩法）。`draw2D()` 是 2D 小視窗畫法。難度：簡易版被打到掉道具、撿回來即可；正常版 5 格體力，歸零失敗。簡易版與手機用 2D 小視窗（`#trial` 內），正常版在桌機進 3D 採集場（`js/fight3d.js` 畫，`#fight-hud` 資訊列，移動透過 main.js 的 `state.moveHook`）。
 - `js/trials.js`：導師試煉小遊戲（`installTrials(registerTrial)`，由 main.js 呼叫）。每個小遊戲 `fn(容器, 試煉資料, { win })` 回傳清理函式，題目答案讀 `data/quests.js`。操作一律用點選（不用拖曳），滑鼠、觸控、鍵盤都能玩；窄螢幕要另外檢查版面。12 個都已完成：network、sequence、prompt、nodes、airflow、sorting、stack、bracing、matching、storeplan、spotbrand、moodboard。全部通過後可領「試煉合格證」（`js/quests.js` 的 `drawCertificate()` 用 canvas 畫，可填名字、下載 PNG，註明非正式學歷證明）。
 - `js/main.js`：ES module。主要段落依序為：地形高度函式 `terrainInfo()` → 地形網格 → NPC 站位 → 各區域地標 `build<Region>()` → 植被 → NPC → 玩家 → 控制（導覽 OrbitControls／探險第三人稱）→ 介面（導師卡、圖鑑、小地圖）→ 主迴圈。
 - 地圖尺寸：島嶼半徑 `ISLAND_R` 150、區域中心距王都 `REGION_DIST` 80。改尺寸時一併檢查地形 `SIZE`、植被與岩石範圍、雲、`controls.maxDistance`、探險邊界、小地圖 `WORLD_HALF`。陰影由 `updateShadow()` 跟著鏡頭焦點走。
@@ -36,4 +37,5 @@
 ## 測試
 `window.__quest` 暴露 `setMode`、`selectTeacher`、`goRegion` 等函式，方便用 Playwright 驅動截圖。
 修改後執行 `node tools/smoke-test.js`（截圖存在 `dist/screens/`），全部通過再提交。
+改到採集戰（`js/fight.js`、`js/fight3d.js`）時執行 `node tools/play-fights.js`（`MOBILE=1` 手機、`MODE=3d` 正常版 3D 採集場），它會用每個玩法的 bot 先模擬再實際玩到結束；新增玩法要寫 `bot`。
 改到試煉小遊戲或 `data/quests.js` 的題目時，再執行 `node tools/play-trials.js`（手機尺寸加 `MOBILE=1`），它會照答案自動玩完每個小遊戲，確認都能通關；新增小遊戲時要在這支腳本補上自動玩法。

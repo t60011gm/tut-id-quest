@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=3';
+import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=4';
 import { installTrials } from './trials.js?v=2';
 
 const W = window.WORLD;
@@ -2006,9 +2006,13 @@ function updateExplore(dt) {
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw);
   let mx = -sy * -iz + cy * ix, mz = -cy * -iz - sy * ix;
   const len = Math.hypot(mx, mz);
-  const moving = len > 0.05 && !state.card && !state.busy;
+  let moving = len > 0.05 && !state.card && !state.busy;
   const p = player.position;
-  if (moving) {
+  if (state.moveHook) { // 採集戰：移動交給任務系統（限制在場內、速度較慢）
+    const k = moving ? Math.min(1, len) / len : 0;
+    moving = state.moveHook(mx * k, mz * k, dt);
+    if (moving) state.walkT += dt * 7;
+  } else if (moving) {
     const k = Math.min(1, len) / len;
     mx *= k; mz *= k;
     const speed = 12 * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 1.7 : 1);
@@ -2049,11 +2053,11 @@ function updateExplore(dt) {
     syncInteract();
   }
 }
-/* 手機互動鈕：靠近導師是「對話」，靠近任務小怪是「淨化」 */
+/* 手機互動鈕：靠近導師是「對話」，靠近任務小怪是「挑戰」 */
 function syncInteract() {
   const b = $('#btn-interact'), m = quests && quests.nearMonster;
   b.disabled = !state.nearNPC && !m;
-  b.textContent = m && !state.nearNPC ? '淨化' : '對話';
+  b.textContent = m && !state.nearNPC ? '挑戰' : '對話';
 }
 function interact() {
   if (state.mode !== 'explore' || state.card || state.busy) return;
@@ -2065,7 +2069,7 @@ function interact() {
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (state.card) closeCard(); else if ($('#codex').classList.contains('open')) toggleCodex(false); return; }
   if (e.code === 'Tab' && state.card) { trapFocus(e, $('#card-sheet')); return; }
-  if (state.busy) return; // 淨化、試煉、重置視窗開著時，不處理移動與對話快捷鍵
+  if (state.busy) return; // 採集戰小視窗、試煉、重置視窗開著時，不處理移動與對話快捷鍵
   if (e.target.closest && e.target.closest('input, textarea')) return;
   if (state.mode !== 'explore' || !state.started) return;
   if (['KeyE', 'Enter', 'Space'].includes(e.code)) { interact(); e.preventDefault(); return; }
@@ -2102,7 +2106,7 @@ function pick(e) {
   const rect = dom.getBoundingClientRect();
   ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
-  if (state.busy || quests.pick(ray)) return; // 點到任務小怪就開始淨化
+  if (state.busy || quests.pick(ray)) return; // 點到任務小怪就打開採集戰；採集戰中點畫面＝使用道具
   const hit = ray.intersectObjects(hitTargets, false)[0];
   if (hit) selectTeacher(hit.object.userData.f);
 }
@@ -2553,8 +2557,14 @@ const sound = (() => {
     if (name === 'card') { tone(784, t, 0.5, 0.12); tone(1174.7, t + 0.08, 0.6, 0.1); }
     else if (name === 'reveal') burst(t, 1.3, 300, 0.5, master, 2600);
     else if (name === 'visit') [523.3, 659.3, 784, 1046.5].forEach((f, i) => tone(f, t + i * 0.07, 0.6, 0.1, 'triangle'));
-    else if (name === 'purify') { burst(t, 0.4, 1800, 0.25, master, 5000); tone(1318.5, t + 0.05, 0.5, 0.1); tone(1760, t + 0.12, 0.6, 0.08); }
     else if (name === 'miss') tone(196, t, 0.25, 0.12, 'square');
+    // 採集戰
+    else if (name === 'hit') { burst(t, 0.12, 900, 0.35); tone(140, t, 0.12, 0.2, 'triangle'); }
+    else if (name === 'shoot') tone(1400, t, 0.09, 0.05, 'triangle');
+    else if (name === 'pickup') { tone(1046.5, t, 0.18, 0.08); tone(1568, t + 0.06, 0.25, 0.07); }
+    else if (name === 'hurt') { tone(260, t, 0.3, 0.14, 'square'); tone(170, t + 0.08, 0.35, 0.12, 'square'); }
+    else if (name === 'beep') tone(1250, t, 0.06, 0.04);
+    else if (name === 'fail') [392, 329.6, 261.6].forEach((f, i) => tone(f, t + i * 0.16, 0.5, 0.1, 'triangle'));
   }
   const btn = $('#btn-sound');
   function set(v) {
@@ -2684,8 +2694,8 @@ const mergeInfo = mergeStatic();
 
 /* 任務系統（js/quests.js）：在合併靜態模型之後建立，小怪才不會被合併 */
 const quests = initQuests({
-  scene, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
-  flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract, openReset
+  scene, camera, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
+  flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract, openReset, setMode
 });
 installTrials(registerTrial); // 導師試煉小遊戲（js/trials.js）
 

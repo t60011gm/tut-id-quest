@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=14">
+<link rel="stylesheet" href="css/style.css?v=15">
 </head>
 <body>
 
@@ -102,12 +102,13 @@
   <button class="reset-btn" id="btn-reset" type="button">重新開始冒險</button>
 </aside>
 
-<!-- 淨化小遊戲 -->
-<div id="purify" class="plate" role="dialog" aria-label="淨化" hidden>
-  <button class="icon-btn pf-close" type="button" aria-label="取消淨化"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-  <small>淨化</small><b class="pf-name"></b>
-  <canvas width="320" height="320"></canvas>
-  <p class="pf-msg"></p>
+<!-- 採集戰（正常版在 3D 採集場時的資訊列） -->
+<div id="fight-hud" class="plate" role="status" hidden>
+  <div class="fh"></div>
+  <div class="fh-actions">
+    <button type="button" class="fh-act"></button>
+    <button type="button" class="fh-quit">撤退（Esc）</button>
+  </div>
 </div>
 
 <!-- 導師試煉 -->
@@ -176,7 +177,7 @@
 </div>
 
 <script src="data/faculty.js?v=7"></script>
-<script src="data/quests.js?v=2"></script>
+<script src="data/quests.js?v=3"></script>
 <script type="importmap">
 {
   "imports": {
@@ -186,6 +187,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=12"></script>
+<script type="module" src="js/main.js?v=13"></script>
 </body>
 </html>

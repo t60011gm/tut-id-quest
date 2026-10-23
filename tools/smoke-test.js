@@ -102,6 +102,15 @@ async function run(browser, name, opts) {
   const spawned = await page.evaluate(() => window.__quest.quests.debug.monsters());
   await page.keyboard.press('Escape');
   check('接任務後出現小怪', spawned > 0, `${spawned} 隻`);
+  // 採集戰：選簡易版開啟 2D 小視窗，Esc 撤退
+  await page.evaluate(() => { const q = window.__quest; q.quests.openFight(q.faculty.find((f) => f.id === 'huang-jiao-yi')); });
+  await page.waitForTimeout(500);
+  await page.click('[data-tr="fight-easy"]');
+  await page.waitForTimeout(1200);
+  const fightOk = await page.evaluate(() => { const d = window.__quest.quests.debug.fight(); return !!d && d.mode === '2d' && !!document.querySelector('.f2-canvas'); });
+  await shot('fight');
+  await page.keyboard.press('Escape');
+  check('採集戰小視窗開啟與撤退', fightOk && await page.evaluate(() => !window.__quest.quests.debug.fight() && document.querySelector('#trial').hidden));
   const stage = await page.evaluate(() => {
     const d = window.__quest.quests.debug;
     while (d.collectOne('huang-jiao-yi'));

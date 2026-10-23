@@ -2,17 +2,18 @@
  * 南應大室研所大冒險 · 任務資料檔（題目與答案）
  * -------------------------------------------------------------------------
  * 每位導師兩階段任務：
- *   stage1  採集任務：到該區的採集場淨化小怪，收集道具
+ *   stage1  採集戰：接任務時拿到老師的道具，到該區採集場打一場動作小遊戲，取得道具
  *   stage2  「○○老師的試煉」：一個小遊戲，通關後顯示知識小卡並獲得徽章
  *
  * 題目依一般專業常識撰寫，正式上線前請各位老師審閱自己的題目。
  * 修改後執行 node tools/quest-sheet.js 重新產生審閱用的 docs/quest-answers.md。
  *
  * 欄位說明
- *   settings.count / quickCount   第一階段收集數量（一般／快速模式）
+ *   settings.count / quickCount   採集戰要取得的道具數（一般／快速模式）
  *   teachers[老師 id]
  *     badge     徽章名稱
  *     stage1    monster 小怪（shape 外型：blob 史萊姆／cube 方塊／sprite 精靈／cloud 霧團／golem 魔像／bug 蟲；color 顏色）、
+ *               game 採集戰（type 玩法，對應 js/fight.js 的 GAMES；title 名稱；tool／toolDesc 老師給的道具；rules 玩法說明）、
  *               item 道具、lines 對話（accept 接任務、hint 提示、done 收集完成）
  *     stage2    game 小遊戲類型、title 試煉名稱、intro 開場白、rules 玩法說明、
  *               rounds 題目（含答案）、win 通關台詞、knowledge 知識小卡
@@ -30,6 +31,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "孤島史萊姆", shape: "blob", color: "#ffd36b", desc: "跟誰都沒有連線的小史萊姆，抱著別人的人脈信物不放。" },
         item: { name: "人脈信物", desc: "代表一段人際連結的信物。" },
+        game: { type: "link", title: "連起孤島", tool: "連線法杖", toolDesc: "對附近的孤島史萊姆射出連線，最多同時牽 3 條。", rules: "靠近孤島史萊姆按道具鍵牽起連線，牽滿 3 隻就會連成三角形，把牠們收服（三角閉合）。拉太遠連線會斷；小心會打斷連線的流言黑球（紅圈）。" },
         lines: {
           accept: "每一段人際連結都是一條線。到王都近郊把孤島史萊姆帶回網路裡，收回人脈信物吧！",
           hint: "孤島史萊姆在王都近郊遊蕩。",
@@ -81,6 +83,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "工期拖延怪", shape: "golem", color: "#b58b5a", desc: "專門把材料藏起來、讓工程延宕的小怪。" },
         item: { name: "建材樣品", desc: "磁磚、木皮、油漆、燈具、五金等樣品。" },
+        game: { type: "guard", title: "守住建材堆", tool: "工地圍籬盾", toolDesc: "舉盾一推，把身邊的小怪擊退。", rules: "工期拖延怪會從四周衝向中央的建材堆偷樣品。用盾把牠們擊退，打兩下就會掉出建材樣品。建材堆被偷光就糟了！" },
         lines: {
           accept: "工地缺料了！工期拖延怪把建材樣品藏在王都近郊，去把它們搶回來。",
           hint: "工期拖延怪在王都近郊。",
@@ -121,6 +124,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "雜訊蟲", shape: "cube", color: "#3ee6ff", desc: "不停閃爍的方塊蟲，把提示詞咬得支離破碎。" },
         item: { name: "提示詞碎片", desc: "寫著風格、色調、材質、光線的關鍵字。" },
+        game: { type: "denoise", title: "去除雜訊", tool: "去噪光槍", toolDesc: "自動瞄準最近的雜訊蟲射擊。", rules: "雜訊蟲閃爍時打不中，等牠變清楚（出現藍圈）的瞬間開槍，就像擴散模型一步步去除雜訊。每隻要打兩下；小心牠們吐出的粉紅雜訊彈。" },
         lines: {
           accept: "雜訊蟲把提示詞咬碎了！到雜訊林地把碎片收回來，我們來生成一個空間。",
           hint: "雜訊蟲在運算之森北邊的雜訊林地。",
@@ -160,6 +164,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "斷線精靈", shape: "sprite", color: "#c3adff", desc: "會把節點之間的連線剪斷的小精靈。" },
         item: { name: "參數節點", desc: "矩形、移動複製、旋轉、放樣、數字滑桿等節點。" },
+        game: { type: "nodes", title: "節點捕捉網", tool: "節點發射器", toolDesc: "在腳下放一個節點，節點之間會自動連線。", rules: "最多同時放 3 個節點，連線最長 9 公尺，節點 14 秒後消失。斷線精靈沿著固定的參數曲線飛行，預測牠的路線，讓牠穿過你的連線就抓到了。" },
         lines: {
           accept: "斷線精靈把參數節點偷走了！到雜訊林地把它們找回來，我們來接一座參數化的塔。",
           hint: "斷線精靈也躲在雜訊林地。",
@@ -204,8 +209,9 @@ window.QUESTS = {
       stage1: {
         monster: { name: "汙染霧團", shape: "cloud", color: "#8a8f9b", desc: "甲醛霧與二氧化碳雲，躲在高地上看不見。" },
         item: { name: "感測晶片", desc: "能量測空氣品質的小晶片。" },
+        game: { type: "sensor", title: "揪出污染霧團", tool: "感測器與換氣扇", toolDesc: "感測器偵測附近的污染；換氣扇把前方的霧團吹走。", rules: "污染霧團平常幾乎看不見，靠近時感測器的嗶聲會變快、霧團也會現形。站在霧團後方，用換氣扇把它吹進場邊的排風口。待在霧團裡太久會咳嗽受傷。" },
         lines: {
-          accept: "空氣汙染看不見，但會影響每一口呼吸。帶著偵測器到汙染高地，找出汙染霧團並淨化它們。",
+          accept: "空氣汙染看不見，但會影響每一口呼吸。帶著偵測器到汙染高地，找出汙染霧團，把它們吹進排風口。",
           hint: "偵測器嗶聲越急，表示越靠近汙染源。",
           done: "晶片收齊了。接下來，換你來管理一間教室的空氣。"
         }
@@ -240,6 +246,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "廢料魔像", shape: "golem", color: "#8c7a66", desc: "由裝修廢料堆成的魔像，身上卡著各種建材。" },
         item: { name: "廢建材", desc: "木料、紅磚、玻璃、鋼材、石膏板、塑膠。" },
+        game: { type: "recycle", title: "拆解與分類", tool: "拆解槌", toolDesc: "敲打廢料魔像；靠近材料時撿起，靠近回收站時投入。", rules: "敲三下拆解廢料魔像，牠會散成木料、紅磚、玻璃。一次拿一塊，丟進同色的回收站。材料放太久沒分類，會重新組回魔像！" },
         lines: {
           accept: "建材的下一輩子，從拆下來那一刻就決定了。到汙染高地拆解廢料魔像，把廢建材回收回來。",
           hint: "廢料魔像也在汙染高地。",
@@ -287,6 +294,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "卡料小怪", shape: "bug", color: "#f28c28", desc: "躲在 3D 印表機裡，把線材纏成一團。" },
         item: { name: "線材捲", desc: "3D 列印用的塑料線材。" },
+        game: { type: "trail", title: "線材圍捕", tool: "熱熔噴嘴", toolDesc: "走過的路會留下線材；按道具鍵切換出料或暫停。", rules: "繞一圈讓線材頭尾接起來，就能圍住圈內的卡料小怪。正在啃線材（橘圈）的小怪不會亂跑，最好抓；跑動的小怪會咬斷線材。" },
         lines: {
           accept: "印表機又卡料了！到木料堆置場把卡料小怪清出來，取回線材捲。",
           hint: "卡料小怪在匠人工坊東北邊的木料堆置場。",
@@ -316,6 +324,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "白蟻小怪", shape: "bug", color: "#f3e6cc", desc: "啃食木構件的小白蟻，偷走了榫卯構件。" },
         item: { name: "榫卯構件", desc: "榫頭與卯眼，木構造接合的關鍵。" },
+        game: { type: "whack", title: "守護木構架", tool: "木槌", toolDesc: "敲擊身邊的白蟻。", rules: "白蟻會從四根木柱旁冒出來啃柱子，靠近柱子用木槌敲掉牠們，每敲走 2 隻得到 1 個榫卯構件。紅圈的兵蟻會追著你咬，先把牠解決。" },
         lines: {
           accept: "白蟻偷走了榫卯構件！到木料堆置場把它們找回來，我們來搭一座站得住的木構架。",
           hint: "白蟻小怪也在木料堆置場。",
@@ -351,8 +360,9 @@ window.QUESTS = {
       stage1: {
         monster: { name: "冷漠霧靈", shape: "cloud", color: "#9fb3c8", desc: "讓人不想說話的霧靈，遮住了居民的心聲。" },
         item: { name: "社區心願卡", desc: "居民寫下的願望。" },
+        game: { type: "escort", title: "陪伴與參與", tool: "社區邀請函", toolDesc: "把邀請函遞給冷漠霧靈，讓牠停下來聽你說。", rules: "霧靈不用打：待在牠身邊，溫度條升滿牠就會跟著你走。最多帶 3 位居民回到中央的社區布告欄。被紅圈的冷漠旋風碰到，跟著你的居民會被吹散。" },
         lines: {
-          accept: "社區的事要大家一起來。到老街巷弄淨化冷漠霧靈，把居民的心願卡收回來。",
+          accept: "社區的事要大家一起來。到老街巷弄陪伴冷漠霧靈，帶居民回來寫下心願卡。",
           hint: "冷漠霧靈在創生市集東南邊的老街巷弄。",
           done: "心願都收到了。接下來，幫這些心願找到合適的夥伴和地點。"
         }
@@ -387,6 +397,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "預算吞噬怪", shape: "blob", color: "#46b35b", desc: "吃掉專案文件和預算的小怪。" },
         item: { name: "專案文件", desc: "平面圖、色票、報價單、合約、施工照片。" },
+        game: { type: "coins", title: "守住預算", tool: "收銀算盤", toolDesc: "敲打身邊的預算吞噬怪，讓牠把吃掉的金幣吐出來。", rules: "場上散落著預算金幣，比吞噬怪先撿到，每 3 枚換 1 份專案文件。吞噬怪吃太多會變成紅圈的暴食怪追著你跑，用算盤敲牠就會吐出來。" },
         lines: {
           accept: "預算吞噬怪把專案文件吃掉了！到老街巷弄把文件搶回來，案子才能繼續。",
           hint: "預算吞噬怪也在老街巷弄。",
@@ -429,6 +440,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "褪色怪", shape: "sprite", color: "#a8a8a8", desc: "會把品牌吸成灰色的小怪。" },
         item: { name: "品牌元素", desc: "標誌、標準色、標準字、輔助圖形、標語。" },
+        game: { type: "paint", title: "守護品牌色", tool: "標準色噴槍", toolDesc: "對最近的褪色怪噴品牌標準色。", rules: "褪色怪會飛向三面招牌，把顏色吸成灰色。噴中就能讓牠恢復品牌色並離開。顏料只有 6 格，用完要回中央的回收補給站補充，別浪費！" },
         lines: {
           accept: "褪色怪把品牌的顏色都吸走了！到褪色草原把品牌元素收回來。",
           hint: "褪色怪在彩虹高原南邊的褪色草原。",
@@ -471,6 +483,7 @@ window.QUESTS = {
       stage1: {
         monster: { name: "混搭怪", shape: "cube", color: "#e05d8c", desc: "把各種風格亂湊在一起的小怪。" },
         item: { name: "風格靈感", desc: "布料、色票、燈飾、植栽、木材、陶器。" },
+        game: { type: "frame", title: "捕捉風格", tool: "取景框", toolDesc: "對最近的混搭怪按下快門。", rules: "混搭怪頭上的三個風格點會一直換色。等三點同色（出現金圈）的瞬間按快門就能收服；風格還很亂時亂拍，牠會生氣追你。" },
         lines: {
           accept: "混搭怪把風格搞亂了！到褪色草原把風格靈感收回來。",
           hint: "混搭怪也在褪色草原。",

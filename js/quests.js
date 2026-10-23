@@ -1,12 +1,16 @@
 /* =========================================================================
  * 南應大室研所大冒險 · 任務系統
  * 每位導師兩階段：
- *   第一階段（採集）：接任務後，該區採集場出現小怪；淨化小怪取得道具
+ *   第一階段（採集戰）：接任務時拿到老師的道具，到採集場打一場動作小遊戲取得道具
+ *     先選難度：簡易版（2D 小視窗，被打到掉道具）／正常版（3D 採集場，有體力條）；手機一律用 2D 小視窗
+ *     玩法邏輯在 js/fight.js，3D 畫法在 js/fight3d.js
  *   第二階段（試煉）：「○○老師的試煉」小遊戲，通關得到徽章與知識小卡
  * 任務內容在 data/quests.js；這裡只處理流程、3D 小怪與介面。
  * 小遊戲以 registerTrial(類型, 函式) 註冊；尚未註冊的試煉會顯示「製作中」。
  * ========================================================================= */
 import * as THREE from 'three';
+import { createArena, draw2D } from './fight.js?v=1';
+import { createFight3D } from './fight3d.js?v=1';
 
 export const QUEST_KEY = 'tutIdQuest.quests.v1';
 const GAMES = {};
@@ -17,7 +21,7 @@ const STAGE = { NEW: 0, COLLECT: 1, TRIAL: 2, DONE: 3 };
 const DEV = new URLSearchParams(location.search).has('dev'); // ?dev 才會出現「直接通過」測試鈕
 
 export function initQuests(api) {
-  const { scene, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound } = api;
+  const { scene, camera, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound } = api;
   const Q = window.QUESTS;
   const noop = () => {};
   if (!Q) return { update: noop, pick: () => false, interact: () => false, cardHTML: () => '', bindCard: noop, nearMonster: null };
@@ -82,7 +86,17 @@ export function initQuests(api) {
     }
   };
 
-  /* ---------- 採集場的小怪 ---------- */
+  /* 小怪的局部動畫（方塊環繞、翅膀、手臂、腳），閒晃小怪與採集戰共用 */
+  function animateMon(g, t) {
+    g.children.forEach((c) => {
+      if (c.userData.orbit !== undefined) { const a = t * 2 + c.userData.orbit * 2.1; c.position.set(Math.cos(a) * 1, 1.3 + Math.sin(a * 2) * 0.2, Math.sin(a) * 1); c.visible = Math.sin(t * 13 + c.userData.orbit) > -0.6; }
+      if (c.userData.wing) c.rotation.y = c.userData.wing * (0.4 + Math.sin(t * 18) * 0.5);
+      if (c.userData.arm) c.rotation.x = Math.sin(t * 4 + c.userData.arm) * 0.5;
+      if (c.userData.leg !== undefined) c.rotation.x = Math.sin(t * 14 + c.userData.leg * 2) * 0.4;
+    });
+  }
+
+  /* ---------- 採集場裡閒晃的小怪（接任務後出現，點牠或靠近按 E 開始採集戰） ---------- */
   const monsters = [];
   const hits = [];
   function despawn(id) {
@@ -96,8 +110,8 @@ export function initQuests(api) {
     despawn(id);
     const s = st(id), f = byId[id], q = Q.teachers[id], fd = fieldOf(f);
     if (s.stage !== STAGE.COLLECT || !fd) return;
-    const n = Math.max(0, need() - s.got);
-    for (let k = 0; k < n; k++) {
+    if (fight && fieldOf(fight.f) === fd) return; // 這塊採集場正在打採集戰，場上由採集戰接手
+    for (let k = 0; k < 3; k++) {
       const g = new THREE.Group();
       const body = (SHAPES[q.stage1.monster.shape] || SHAPES.blob)(g, q.stage1.monster.color || regionOf(f).color);
       const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * (FIELD_R - 3);
@@ -135,7 +149,7 @@ export function initQuests(api) {
     trackEl.hidden = !active.length;
     trackEl.innerHTML = active.map((f) => {
       const s = st(f.id), q = qOf(f);
-      const text = s.stage === STAGE.COLLECT ? `${q.stage1.item.name} ${s.got}/${need()}・${fieldOf(f).name}` : '回去接受試煉';
+      const text = s.stage === STAGE.COLLECT ? `採集戰：${q.stage1.game.title}` : '回去接受試煉';
       return `<button type="button" data-t="${f.id}" style="--region:${regionOf(f).color}"><i></i><b>${esc(f.name)}</b><span>${esc(text)}</span></button>`;
     }).join('');
   }
@@ -169,7 +183,7 @@ export function initQuests(api) {
     const s = st(f.id), fd = fieldOf(f);
     let body = '';
     if (s.stage === STAGE.NEW) body = `<p class="q-line">「${esc(q.stage1.lines.accept)}」</p><button type="button" class="q-btn" data-q="accept">接受任務</button>`;
-    else if (s.stage === STAGE.COLLECT) body = `<p>收集 <b>${esc(q.stage1.item.name)}</b> <span class="q-count">${s.got} / ${need()}</span>・淨化「${esc(q.stage1.monster.name)}」</p><p class="q-hint">${esc(q.stage1.lines.hint)}</p><button type="button" class="q-btn" data-q="go">前往${esc(fd.name)}</button>`;
+    else if (s.stage === STAGE.COLLECT) body = `<p>採集戰「${esc(q.stage1.game.title)}」：用 <b>${esc(q.stage1.game.tool)}</b> 取得 <b>${esc(q.stage1.item.name)}</b> ×${need()}</p><p class="q-hint">${esc(q.stage1.lines.hint)}</p><div class="q-btns"><button type="button" class="q-btn primary" data-q="fight">開始採集戰</button><button type="button" class="q-btn" data-q="go">前往${esc(fd.name)}</button></div>`;
     else if (s.stage === STAGE.TRIAL) body = `<p class="q-line">「${esc(q.stage1.lines.done)}」</p><button type="button" class="q-btn primary" data-q="trial">開始試煉</button>`;
     else body = `<p>已獲得徽章 <b class="q-badge-name">${esc(q.badge)}</b></p><button type="button" class="q-btn" data-q="trial">再挑戰一次試煉</button>`;
     return `<section class="sect quest"><h4>${esc(q.stage2.title.split('：')[0])}</h4>${body}</section>`;
@@ -185,71 +199,9 @@ export function initQuests(api) {
         const html = cardHTML(f); sec.outerHTML = html; bindCard(sheet, f);
         toast(f, qOf(f).stage1.lines.accept);
       } else if (b.dataset.q === 'go') goField(f);
+      else if (b.dataset.q === 'fight') { api.closeCard(); openFight(f); }
       else if (b.dataset.q === 'trial') { api.closeCard(); openTrial(f); }
     });
-  }
-
-  /* ---------- 淨化小遊戲：縮小的光圈與目標圈重疊時按下 ---------- */
-  const pf = $('#purify'), pfCanvas = pf.querySelector('canvas'), pfCtx = pfCanvas.getContext('2d');
-  let qte = null;
-  function startPurify(m) {
-    if (qte || state.card) return;
-    state.busy = true;
-    qte = { m, t0: performance.now(), shake: 0, done: false, msg: '' };
-    pf.style.setProperty('--region', regionOf(m.f).color);
-    pf.querySelector('.pf-name').textContent = m.q.stage1.monster.name;
-    pf.querySelector('.pf-msg').textContent = isTouch ? '光圈和目標圈重疊時，點一下！' : '光圈和目標圈重疊時，按空白鍵或點一下！';
-    pf.hidden = false;
-    requestAnimationFrame(drawPurify);
-  }
-  function endPurify() { qte = null; pf.hidden = true; state.busy = false; }
-  const PF_R = 62, PF_TOL = 13, PF_DUR = 1500;
-  const pfRadius = () => { const k = ((performance.now() - qte.t0) % PF_DUR) / PF_DUR; return 150 - k * 130; };
-  function drawPurify() {
-    if (!qte) return;
-    const c = pfCtx, W = pfCanvas.width, H = pfCanvas.height, col = regionOf(qte.m.f).color;
-    c.clearRect(0, 0, W, H);
-    c.save(); c.translate(W / 2 + (qte.shake > 0 ? Math.sin(qte.shake * 60) * 6 : 0), H / 2);
-    qte.shake = Math.max(0, qte.shake - 0.016);
-    c.lineWidth = PF_TOL * 2; c.strokeStyle = 'rgba(255,255,255,0.12)'; c.beginPath(); c.arc(0, 0, PF_R, 0, Math.PI * 2); c.stroke();
-    c.lineWidth = 3; c.strokeStyle = col; c.beginPath(); c.arc(0, 0, PF_R, 0, Math.PI * 2); c.stroke();
-    if (!qte.done) {
-      const r = pfRadius(), close = Math.abs(r - PF_R) < PF_TOL;
-      c.lineWidth = 5; c.strokeStyle = close ? '#ffd36b' : '#ffffff'; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke();
-    } else {
-      const k = Math.min(1, (performance.now() - qte.doneAt) / 500);
-      c.globalAlpha = 1 - k; c.fillStyle = col; c.beginPath(); c.arc(0, 0, PF_R * (1 + k), 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
-    }
-    c.restore();
-    requestAnimationFrame(drawPurify);
-  }
-  function pressPurify() {
-    if (!qte || qte.done) return;
-    if (Math.abs(pfRadius() - PF_R) < PF_TOL) {
-      qte.done = true; qte.doneAt = performance.now();
-      pf.querySelector('.pf-msg').textContent = '淨化成功！';
-      sound.sfx('purify');
-      const m = qte.m;
-      setTimeout(() => { endPurify(); collect(m); }, 520);
-    } else {
-      qte.shake = 0.3; sound.sfx('miss');
-      pf.querySelector('.pf-msg').textContent = '差一點！再試一次';
-    }
-  }
-  pf.addEventListener('pointerdown', (e) => { if (e.target.closest('.pf-close')) return; e.preventDefault(); pressPurify(); });
-  pf.querySelector('.pf-close').addEventListener('click', endPurify);
-
-  function collect(m) {
-    const s = st(m.id);
-    m.gone = performance.now();
-    s.got = Math.min(need(), s.got + 1);
-    const q = m.q;
-    if (s.got >= need()) {
-      s.stage = STAGE.TRIAL;
-      setTimeout(() => despawn(m.id), 700);
-      toast(m.f, q.stage1.lines.done, `回到${m.f.name}老師身邊，接受試煉`);
-    } else toast(m.f, `取得「${q.stage1.item.name}」`, `${s.got} / ${need()}`);
-    refreshAll();
   }
 
   /* ---------- 試煉視窗 ---------- */
@@ -267,6 +219,193 @@ export function initQuests(api) {
     tr.hidden = false;
     trBody.querySelector('[data-tr="start"]').focus({ preventScroll: true });
   }
+  /* ---------- 採集戰：選難度 → 2D 小視窗或 3D 採集場 → 結果 ---------- */
+  let fight = null; // { f, E, mode: '2d'|'3d', hard, input, r3, raf, cleanup }
+  const gameOf = (f) => qOf(f).stage1.game;
+  const hudHTML = (f) => `
+    <div class="fh-top"><b class="fh-title">${esc(gameOf(f).title)}</b><span class="fh-prog"></span><span class="fh-hp"></span></div>
+    <div class="fh-meter"></div>
+    <div class="fh-msg" aria-live="polite"></div>`;
+  function paintHud(root, E) {
+    const f = fight.f;
+    root.querySelector('.fh-prog').textContent = `${qOf(f).stage1.item.name} ${E.got} / ${E.need}`;
+    root.querySelector('.fh-hp').innerHTML = E.hard ? Array.from({ length: E.P.max }, (_, i) => `<i class="${i < E.P.hp ? 'on' : ''}"></i>`).join('') : '<small>簡易版</small>';
+    root.querySelector('.fh-meter').textContent = E.meter;
+    const msg = root.querySelector('.fh-msg'), text = E.msgT > 0 ? E.msg : '';
+    if (msg.textContent !== text) msg.textContent = text;
+  }
+  function newArena(f, hard) {
+    const q = qOf(f);
+    return createArena({
+      type: gameOf(f).type, hard, need: need(), monster: q.stage1.monster, item: q.stage1.item, color: regionOf(f).color,
+      sfx: (n) => sound.sfx(n), onEnd: (E) => setTimeout(() => endFight(E), E.result === 'win' ? 700 : 900)
+    });
+  }
+
+  /* 簡報：老師交給你的道具、玩法、難度選擇 */
+  function openFight(f) {
+    const q = qOf(f), g = gameOf(f); if (!g) return;
+    if (fight) return;
+    trialTeacher = f; state.busy = true; state.paused = true;
+    tr.style.setProperty('--region', regionOf(f).color);
+    tr.querySelector('.trial-title').textContent = `採集戰：${g.title}`;
+    trBody.innerHTML = `
+      <div class="tool-get"><span class="tool-icon">${esc(g.tool.slice(-1))}</span><div><small>${esc(f.name)}老師交給你</small><b>${esc(g.tool)}</b><p>${esc(g.toolDesc)}</p></div></div>
+      <p class="trial-rules">${esc(g.rules)}<br>目標：取得 <b>${need()}</b> 個「${esc(q.stage1.item.name)}」。</p>
+      <div class="diff-pick">
+        <button type="button" data-tr="fight-easy"><b>簡易版</b><span>小視窗遊玩<br>被打到會掉道具，撿回來就好</span></button>
+        <button type="button" data-tr="fight-hard"><b>正常版</b><span>${isTouch ? '小視窗遊玩' : '直接在採集場裡打'}<br>有 5 格體力，倒下要重來</span></button>
+      </div>
+      <p class="fight-keys">${isTouch ? '操作：左下搖桿移動，右下按鈕使用道具' : '操作：WASD／方向鍵移動，空白鍵使用道具'}</p>`;
+    tr.hidden = false;
+    trBody.querySelector('[data-tr="fight-easy"]').focus({ preventScroll: true });
+  }
+  const sameField = (f) => faculty.filter((x) => Q.teachers[x.id] && fieldOf(x) === fieldOf(f));
+  function startFight(f, hard) {
+    sameField(f).forEach((x) => despawn(x.id)); // 同一塊採集場的閒晃小怪先收起來
+    if (hard && !isTouch) start3D(f); else start2D(f, hard);
+  }
+
+  /* 2D 小視窗（簡易版、手機） */
+  function start2D(f, hard) {
+    const g = gameOf(f), E = newArena(f, hard);
+    trialTeacher = f; state.busy = true; state.paused = true; tr.hidden = false;
+    tr.querySelector('.trial-title').textContent = `採集戰：${g.title}`;
+    trBody.innerHTML = `
+      <div class="fight2d">
+        <div class="fh">${hudHTML(f)}</div>
+        <div class="f2-stage"><canvas class="f2-canvas" aria-label="採集戰場地"></canvas></div>
+        <div class="f2-ctrl">
+          ${isTouch ? '<div class="f2-joy" aria-hidden="true"><span class="knob"></span></div>' : `<p class="fight-keys">WASD／方向鍵移動・空白鍵使用「${esc(g.tool)}」</p>`}
+          <button type="button" class="f2-act">${esc(g.tool)}</button>
+        </div>
+      </div>`;
+    const cv = trBody.querySelector('.f2-canvas'), ctx = cv.getContext('2d'), hud = trBody.querySelector('.fh');
+    const keys = new Set(), joy = { x: 0, z: 0 };
+    let W = 0;
+    const fit = () => {
+      const box = trBody.querySelector('.f2-stage');
+      const css = Math.max(240, Math.min(box.clientWidth, window.innerHeight - (isTouch ? 330 : 360), 560));
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      cv.style.width = cv.style.height = css + 'px'; cv.width = cv.height = Math.round(css * dpr); W = cv.width;
+    };
+    fit(); window.addEventListener('resize', fit);
+    const MOVE = { KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
+    const ACT = ['Space', 'Enter', 'KeyE', 'KeyJ', 'KeyK'];
+    const kd = (e) => {
+      if (tr.hidden || e.target.closest('input, textarea')) return;
+      if (MOVE[e.code]) { keys.add(e.code); e.preventDefault(); }
+      else if (ACT.includes(e.code)) { if (!e.target.closest('button') || e.target.classList.contains('f2-act')) { E.act(); e.preventDefault(); } }
+    };
+    const ku = (e) => keys.delete(e.code);
+    window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    trBody.querySelector('.f2-act').addEventListener('pointerdown', (e) => { e.preventDefault(); E.act(); });
+    trBody.querySelector('.f2-act').addEventListener('click', (e) => { if (e.detail === 0) E.act(); }); // 鍵盤按 Enter 觸發的 click
+    const js = trBody.querySelector('.f2-joy');
+    if (js) {
+      const knob = js.querySelector('.knob'); let pid = null;
+      const mv = (e) => {
+        const r = js.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+        const d = Math.hypot(dx, dy), max = r.width * 0.36; if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`; joy.x = dx / max; joy.z = dy / max;
+      };
+      js.addEventListener('pointerdown', (e) => { pid = e.pointerId; js.setPointerCapture(pid); mv(e); e.preventDefault(); });
+      js.addEventListener('pointermove', (e) => { if (e.pointerId === pid) mv(e); });
+      const end = (e) => { if (e.pointerId !== pid) return; pid = null; joy.x = joy.z = 0; knob.style.transform = ''; };
+      js.addEventListener('pointerup', end); js.addEventListener('pointercancel', end);
+    }
+    let last = performance.now();
+    const loop = (now) => {
+      if (!fight || fight.E !== E) return;
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      let mx = joy.x, mz = joy.z;
+      for (const k of keys) { mx += MOVE[k][0]; mz += MOVE[k][1]; }
+      for (let k = 0; k < (fight.speed || 1) && !E.done; k++) E.update(dt, { mx, mz });
+      draw2D(ctx, E, W, now / 1000);
+      paintHud(hud, E);
+      fight.raf = requestAnimationFrame(loop);
+    };
+    fight = { f, E, mode: '2d', hard };
+    fight.cleanup = () => {
+      cancelAnimationFrame(fight.raf);
+      window.removeEventListener('resize', fit); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);
+    };
+    trialCleanup = () => stopFight();
+    fight.raf = requestAnimationFrame(loop);
+    trBody.querySelector('.f2-act').focus({ preventScroll: true });
+  }
+
+  /* 3D 採集場（正常版，桌機） */
+  const hudEl = $('#fight-hud');
+  function start3D(f) {
+    const fd = fieldOf(f), E = newArena(f, true);
+    tr.hidden = true; state.busy = false; state.paused = false; trialTeacher = null;
+    api.closeCard();
+    if (state.mode !== 'explore') api.setMode('explore');
+    const P = E.P, wx = fd.x + P.x, wz = fd.z + P.z;
+    api.teleport(wx, wz, Math.atan2(-Math.sin(P.face), -Math.cos(P.face)));
+    const input = { mx: 0, mz: 0 };
+    const r3 = createFight3D({ scene, camera, player, heightAt, mat, SHAPES, animateMon, origin: { x: fd.x, z: fd.z }, E });
+    state.moveHook = (mx, mz) => { input.mx = mx; input.mz = mz; return E.P.moving; };
+    hudEl.style.setProperty('--region', regionOf(f).color);
+    hudEl.querySelector('.fh').innerHTML = hudHTML(f);
+    hudEl.querySelector('.fh-act').textContent = `${gameOf(f).tool}（空白鍵）`;
+    hudEl.hidden = false;
+    fight = { f, E, mode: '3d', hard: true, input, r3, origin: fd };
+    fight.cleanup = () => { r3.dispose(); state.moveHook = null; hudEl.hidden = true; };
+    toast(f, `「${gameOf(f).tool}」準備好了！`, gameOf(f).rules);
+  }
+  hudEl.querySelector('.fh-act').addEventListener('click', () => { if (fight && fight.mode === '3d') fight.E.act(); });
+  hudEl.querySelector('.fh-quit').addEventListener('click', () => abandonFight());
+
+  function stopFight() {
+    if (!fight) return;
+    const f = fight.f;
+    fight.cleanup(); fight = null;
+    sameField(f).forEach((x) => { if (st(x.id).stage === STAGE.COLLECT) spawn(x.id); });
+  }
+  function abandonFight() {
+    if (!fight) return;
+    const f = fight.f;
+    stopFight();
+    toast(f, '先撤退了', '準備好再回來挑戰採集戰');
+  }
+  function endFight(E) {
+    if (!fight || fight.E !== E) return;
+    const f = fight.f, hard = fight.hard, q = qOf(f), s = st(f.id);
+    stopFight();
+    trialTeacher = f; state.busy = true; state.paused = true;
+    tr.style.setProperty('--region', regionOf(f).color);
+    tr.querySelector('.trial-title').textContent = `採集戰：${gameOf(f).title}`;
+    if (E.result === 'win') {
+      if (s.stage === STAGE.COLLECT) { s.stage = STAGE.TRIAL; s.got = need(); despawn(f.id); }
+      refreshAll(); sound.sfx('visit');
+      trBody.innerHTML = `
+        <div class="trial-win">
+          <div class="badge-medal big" style="--region:${regionOf(f).color}"><span>${esc(q.stage1.item.name)}</span></div>
+          <h3>採集完成！</h3>
+          <p class="trial-intro">取得 ${E.need} 個「${esc(q.stage1.item.name)}」${E.hard ? '（正常版）' : ''}</p>
+          <p class="trial-intro">${esc(f.name)}老師：「${esc(q.stage1.lines.done)}」</p>
+          <div class="trial-actions"><button type="button" class="q-btn primary" data-tr="to-trial">接受試煉</button><button type="button" class="q-btn" data-tr="close">稍後再說</button></div>
+        </div>`;
+      toast(f, q.stage1.lines.done, `回到${f.name}老師身邊，或直接接受試煉`);
+    } else {
+      trBody.innerHTML = `
+        <div class="trial-win">
+          <h3>${esc(E.reason || '失敗了')}</h3>
+          <p class="trial-intro">這次取得 ${E.got} / ${E.need} 個「${esc(q.stage1.item.name)}」。正常版倒下就要重來，也可以改用簡易版。</p>
+          <div class="trial-actions"><button type="button" class="q-btn primary" data-tr="${hard ? 'fight-hard' : 'fight-easy'}">再試一次</button>${hard ? '<button type="button" class="q-btn" data-tr="fight-easy">改用簡易版</button>' : ''}<button type="button" class="q-btn" data-tr="close">先離開</button></div>
+        </div>`;
+    }
+    tr.hidden = false;
+    trBody.querySelector('.q-btn').focus({ preventScroll: true });
+  }
+  /* 測試或快速完成：直接把第一階段標成完成 */
+  function completeCollect(f) {
+    const s = st(f.id); if (s.stage !== STAGE.COLLECT) return;
+    s.stage = STAGE.TRIAL; s.got = need(); despawn(f.id); refreshAll();
+  }
+
   function startGame() {
     const f = trialTeacher, q = qOf(f), game = GAMES[q.stage2.game];
     trBody.innerHTML = '<div class="trial-game"></div>';
@@ -306,16 +445,15 @@ export function initQuests(api) {
     else if (b.dataset.tr === 'devwin') winTrial();
     else if (b.dataset.tr === 'cert') showCertificate();
     else if (b.dataset.tr === 'download') downloadCertificate();
+    else if (b.dataset.tr === 'fight-easy' || b.dataset.tr === 'fight-hard') { const f = trialTeacher; if (trialCleanup) { trialCleanup(); trialCleanup = null; } startFight(f, b.dataset.tr === 'fight-hard'); }
+    else if (b.dataset.tr === 'to-trial') openTrial(trialTeacher);
   });
   tr.querySelector('.trial-close').addEventListener('click', closeTrial);
 
-  // 淨化與試煉開著時攔下鍵盤，避免角色移動或觸發其他快捷鍵
+  // 試煉視窗開著時 Esc 關閉；3D 採集戰中 Esc 撤退
   window.addEventListener('keydown', (e) => {
-    if (qte) {
-      if (e.code === 'Escape') endPurify();
-      else if (['Space', 'KeyE', 'Enter'].includes(e.code)) pressPurify();
-      e.preventDefault(); e.stopImmediatePropagation();
-    } else if (!tr.hidden && e.code === 'Escape') { closeTrial(); e.stopImmediatePropagation(); }
+    if (!tr.hidden && e.code === 'Escape') { closeTrial(); e.stopImmediatePropagation(); }
+    else if (fight && fight.mode === '3d' && e.code === 'Escape') { abandonFight(); e.stopImmediatePropagation(); }
   }, true);
 
   /* ---------- 試煉合格證（全破獎勵，招生紀念，非正式文件） ---------- */
@@ -390,7 +528,7 @@ export function initQuests(api) {
       <h3 class="log-head">任務進度</h3>
       <div class="quest-rows">${list.map((f) => {
         const s = st(f.id);
-        const detail = s.stage === STAGE.COLLECT ? `${qOf(f).stage1.item.name} ${s.got}/${need()}` : STATUS[s.stage];
+        const detail = s.stage === STAGE.COLLECT ? `採集戰：${qOf(f).stage1.game.title}` : STATUS[s.stage];
         return `<button type="button" class="quest-row" data-t="${f.id}" data-stage="${s.stage}" style="--region:${regionOf(f).color}"><i></i><b>${esc(f.name)}</b><span>${esc(detail)}</span></button>`;
       }).join('')}</div>
       <button type="button" class="reset-all" data-reset-open>重置所有進度</button>`;
@@ -413,13 +551,26 @@ export function initQuests(api) {
     if (st(f.id).stage === STAGE.COLLECT) goField(f); else api.selectTeacher(f, { fromCodex: true });
   });
 
-  /* ---------- 每幀更新：小怪閒晃、探險模式的靠近提示 ---------- */
+  /* ---------- 每幀更新：採集戰、小怪閒晃、探險模式的靠近提示 ---------- */
   let nearMonster = null;
-  const tmp = new THREE.Vector3();
   function update(t, dt) {
+    if (fight && fight.mode === '3d') {
+      const E = fight.E, P = E.P, o = fight.origin;
+      // 切回導覽模式、或從圖鑑／小地圖瞬移到別處，就當作撤退
+      if (state.mode !== 'explore' || Math.hypot(player.position.x - o.x - P.x, player.position.z - o.z - P.z) > 4) abandonFight();
+      else {
+        for (let k = 0; k < (fight.speed || 1) && fight && !E.done; k++) E.update(dt, fight.input);
+        if (fight) { // 可能剛結束
+          player.position.set(o.x + P.x, heightAt(o.x + P.x, o.z + P.z), o.z + P.z);
+          player.rotation.y = P.face;
+          fight.r3.update(t);
+          paintHud(hudEl, E);
+        }
+      }
+    }
     for (const m of monsters) {
       const g = m.group;
-      if (m.gone > 0) { // 淨化後縮小消失
+      if (m.gone > 0) { // 消失動畫
         const k = Math.min(1, (performance.now() - m.gone) / 400);
         g.scale.setScalar(Math.max(0.001, 1 + k * 0.4 - k * 1.4)); continue;
       }
@@ -429,49 +580,53 @@ export function initQuests(api) {
       else { const sp = 1.1 * dt / d; g.position.x += dx * sp; g.position.z += dz * sp; g.rotation.y = Math.atan2(dx, dz); }
       g.position.y = heightAt(g.position.x, g.position.z) + Math.abs(Math.sin(t * 3 + m.ph)) * 0.25;
       m.body.scale.set(1 + Math.sin(t * 6 + m.ph) * 0.04, 1 - Math.sin(t * 6 + m.ph) * 0.04, 1);
-      g.children.forEach((c) => {
-        if (c.userData.orbit !== undefined) { const a = t * 2 + c.userData.orbit * 2.1; c.position.set(Math.cos(a) * 1, 1.3 + Math.sin(a * 2) * 0.2, Math.sin(a) * 1); c.visible = Math.sin(t * 13 + c.userData.orbit) > -0.6; }
-        if (c.userData.wing) c.rotation.y = c.userData.wing * (0.4 + Math.sin(t * 18) * 0.5);
-        if (c.userData.arm) c.rotation.x = Math.sin(t * 4 + c.userData.arm) * 0.5;
-        if (c.userData.leg !== undefined) c.rotation.x = Math.sin(t * 14 + c.userData.leg * 2) * 0.4;
-      });
+      animateMon(g, t);
     }
-    // 探險模式：靠近小怪時顯示淨化提示
+    // 探險模式：靠近小怪時顯示採集戰提示
     let near = null;
-    if (state.mode === 'explore' && !state.card && !qte) {
+    if (state.mode === 'explore' && !state.card && !fight) {
       let nd = 3.4;
       for (const m of monsters) { if (m.gone > 0) continue; const d = Math.hypot(m.group.position.x - player.position.x, m.group.position.z - player.position.z); if (d < nd) { nd = d; near = m; } }
     }
     if (near !== nearMonster) {
       nearMonster = near;
       api.quests.nearMonster = near;
-      if (near) promptEl.innerHTML = isTouch ? `點「淨化」對付 <b>${esc(near.q.stage1.monster.name)}</b>` : `按 <b>E</b> 淨化 <b>${esc(near.q.stage1.monster.name)}</b>`;
+      if (near) promptEl.innerHTML = isTouch ? `點「挑戰」開始採集戰：<b>${esc(near.q.stage1.game.title)}</b>` : `按 <b>E</b> 開始採集戰：<b>${esc(near.q.stage1.game.title)}</b>`;
       promptEl.hidden = !near;
       api.syncInteract();
     }
   }
   function pick(ray) {
+    if (fight && fight.mode === '3d') { fight.E.act(); return true; } // 採集戰中點畫面＝使用道具
     if (!hits.length) return false;
     const h = ray.intersectObjects(hits, false)[0];
     if (!h) return false;
-    startPurify(h.object.userData.monster);
+    openFight(h.object.userData.monster.f);
     return true;
   }
-  function interact() { if (nearMonster && !qte) { startPurify(nearMonster); return true; } return false; }
+  function interact() {
+    if (fight && fight.mode === '3d') { fight.E.act(); return true; }
+    if (nearMonster) { openFight(nearMonster.f); return true; }
+    return false;
+  }
 
   // 載入時：還在採集中的任務重新放出小怪
   faculty.forEach((f) => { if (Q.teachers[f.id] && st(f.id).stage === STAGE.COLLECT) spawn(f.id); });
   refreshMarks(); refreshTracker(); renderLog();  // 載入時不寫入存檔，重置後才會是乾淨的
-  const self = { update, pick, interact, cardHTML, bindCard, nearMonster: null, openTrial };
-  // 測試用（Playwright）：查看小怪數量、直接收集、開啟淨化視窗
+  const self = { update, pick, interact, cardHTML, bindCard, nearMonster: null, openTrial, openFight };
+  // 測試用（Playwright）：查看小怪數量、直接完成採集、操作採集戰
   self.debug = {
     monsters: () => monsters.filter((m) => m.gone < 0).length,
     save: () => JSON.parse(JSON.stringify(save)),
-    collectOne: (id) => { const m = monsters.find((x) => x.id === id && x.gone < 0); if (m) collect(m); return !!m; },
+    collectOne: (id) => { completeCollect(byId[id]); return false; },
+    fight: () => fight && { mode: fight.mode, got: fight.E.got, need: fight.E.need, done: fight.E.done, result: fight.E.result, hp: fight.E.P.hp, t: fight.E.t },
+    fightBot: (on = true) => { if (fight) fight.E.bot = on; return !!fight; },
+    fightSpeed: (n) => { if (fight) fight.speed = n; }, // 3D 測試用：每幀多跑幾步（軟體繪圖太慢）
+    startFight: (id, hard) => { const f = byId[id]; if (!fight) { tr.hidden = true; startFight(f, hard); } },
+    simulate: (id, hard, sec = 300) => { const E = newArena(byId[id], hard); E.onEnd = () => {}; E.bot = true; E.simulate(sec); return { result: E.result, t: E.t, got: E.got }; },
     completeAll: () => { faculty.forEach((f) => { if (Q.teachers[f.id]) st(f.id).stage = STAGE.DONE; }); refreshAll(); },
     showCertificate: () => showCertificate(),
-    firstPos: () => { const m = monsters.find((x) => x.gone < 0); return m && { x: m.group.position.x, z: m.group.position.z }; },
-    purify: (id) => { const m = monsters.find((x) => x.id === id && x.gone < 0); if (m) startPurify(m); return !!m; }
+    firstPos: () => { const m = monsters.find((x) => x.gone < 0); return m && { x: m.group.position.x, z: m.group.position.z }; }
   };
   api.quests = self;
   return self;
