@@ -68,6 +68,16 @@ button { cursor: pointer; }
 .npc-label.dim { opacity: 0.18; }
 .npc-label.far { opacity: 0; pointer-events: none; }
 
+/* 任務採集場名牌 */
+.field-sign {
+  display: flex; flex-direction: column; align-items: center; gap: 1px; pointer-events: none;
+  padding: 3px 10px 4px; border-radius: 6px; border: 1px dashed var(--region);
+  background: rgba(20, 26, 46, 0.72); transition: opacity .3s;
+}
+.field-sign i { font-style: normal; font-size: 10px; letter-spacing: .2em; color: var(--region); }
+.field-sign b { font-family: var(--f-display); font-size: 14px; letter-spacing: .1em; color: var(--ink-light); }
+.field-sign.far { opacity: 0; }
+
 .region-sign {
   pointer-events: auto; cursor: pointer; user-select: none;
   display: flex; flex-direction: column; align-items: center;

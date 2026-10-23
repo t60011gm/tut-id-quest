@@ -16,8 +16,9 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* ---------- 世界常數 ---------- */
-const ISLAND_R = 112;
-const REGION_DIST = 64;
+const ISLAND_R = 150;
+const REGION_DIST = 80;
+const FIELD_R = 13; // 任務採集場半徑
 /* 各區域的場景設定；新增區域時在這裡補一筆，並在 BUILDERS 加地標函式。
  *   rune 旗幟英文　ground 地面色　foliage 樹葉色　floor 平台高度
  *   flat 整平範圍 [外緣, 內緣]　clear 植被淨空半徑　signY 旗幟高度 */
@@ -56,8 +57,13 @@ regions.forEach((r) => {
   r.col = new THREE.Color(r.color);
   r.ground = new THREE.Color(r.style.ground);
   r.teachers = [];
+  if (r.field) { // 任務採集場：兩區之間沒有道路的荒野
+    const fa = THREE.MathUtils.degToRad(r.field.angle);
+    r.field.x = Math.sin(fa) * r.field.dist; r.field.z = -Math.cos(fa) * r.field.dist;
+  }
   RG[r.id] = r;
 });
+const fields = regions.filter((r) => r.field).map((r) => ({ r, ...r.field }));
 const faculty = W.faculty;
 faculty.forEach((f, i) => { f.index = i; (RG[f.region] || RG.capital).teachers.push(f); });
 
@@ -87,7 +93,7 @@ function terrainInfo(x, z) {
   const cr = coastR(x, z);
   const land = sstep(cr, cr - 16, d);
   let h = 1.6 + fbm(x * 0.028 + 10, z * 0.028 + 10) * 6 + fbm(x * 0.11, z * 0.11) * 0.9;
-  h += sstep(40, 90, d) * 3 * fbm(x * 0.05 + 3, z * 0.05 + 7);
+  h += sstep(50, 115, d) * 3 * fbm(x * 0.05 + 3, z * 0.05 + 7);
   let near = RG.capital, nearD = 1e9;
   for (const r of regions) {
     const rd = Math.hypot(x - r.x, z - r.z);
@@ -107,8 +113,13 @@ function terrainInfo(x, z) {
       pathW = Math.max(pathW, sstep(3.2, 1.6, pd) * sstep(0.25, 0.3, t) * sstep(0.83, 0.76, t));
     }
   }
+  let fieldW = 0, field = null;
+  for (const f of fields) {
+    const w = sstep(FIELD_R, FIELD_R - 4, Math.hypot(x - f.x, z - f.z));
+    if (w > fieldW) { fieldW = w; field = f; }
+  }
   h = h * land + (1 - land) * -5;
-  return { h, pathW: pathW * land, near, nearD };
+  return { h, pathW: pathW * land, near, nearD, fieldW: fieldW * land, field };
 }
 const heightAt = (x, z) => terrainInfo(x, z).h;
 
@@ -132,9 +143,9 @@ const labelRenderer = new CSS2DRenderer({ element: $('#labels') });
 labelRenderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#ead2b2', 170, 430);
+scene.fog = new THREE.Fog('#ead2b2', 210, 520);
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 1500);
-camera.position.set(0, 125, 175);
+camera.position.set(0, 160, 225);
 
 /* ---------- 天空、海、光 ---------- */
 let skyMat, hemi, sunLight;
@@ -151,7 +162,7 @@ let skyMat, hemi, sunLight;
   scene.add(sky);
 
   const water = new THREE.Mesh(
-    new THREE.CircleGeometry(520, 72),
+    new THREE.CircleGeometry(650, 72),
     new THREE.MeshStandardMaterial({ color: '#2f86a6', roughness: 0.3, metalness: 0.1 })
   );
   water.rotation.x = -Math.PI / 2; water.position.y = 0.05; water.receiveShadow = true;
@@ -296,7 +307,7 @@ function regionCtx(r) {
 
 /* ---------- 地形網格 ---------- */
 {
-  const SIZE = 280, SEG = isTouch ? 170 : 220;
+  const SIZE = 360, SEG = isTouch ? 200 : 280;
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
@@ -312,7 +323,7 @@ function regionCtx(r) {
   const rock = new THREE.Color('#8d8273'), path = new THREE.Color('#dcc58e'), pink = new THREE.Color('#eeb2cc');
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
-    const { h, pathW, near, nearD } = infos[i];
+    const { h, pathW, near, nearD, fieldW, field } = infos[i];
     const x = pos.getX(i), z = pos.getZ(i);
     c.copy(grass).lerp(near.ground, sstep(38, 12, nearD) * 0.78);
     if (near.id === 'plateau' && h > 9.5) c.lerp(pink, 0.35);
@@ -321,6 +332,7 @@ function regionCtx(r) {
     c.lerp(sand, sstep(1.5, 0.6, h));
     c.lerp(wet, sstep(0.2, -1.5, h));
     c.lerp(path, pathW * 0.9);
+    if (fieldW > 0) c.lerp(path, fieldW * 0.45).lerp(field.r.col, fieldW * 0.18);
     const j = 0.93 + hash2(x * 3.1, z * 1.7) * 0.12;
     col[i * 3] = c.r * j; col[i * 3 + 1] = c.g * j; col[i * 3 + 2] = c.b * j;
   }
@@ -1228,17 +1240,47 @@ function buildPlateau(r) {
 const BUILDERS = { capital: buildCapital, forest: buildForest, valley: buildValley, workshop: buildWorkshop, market: buildMarket, plateau: buildPlateau };
 regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
 
+/* ---------- 任務採集場：燈柱圍成的圓、地面虛線邊界與名牌 ---------- */
+const fieldSigns = [];
+fields.forEach((f, fi) => {
+  const g = new THREE.Group(); g.position.set(f.x, 0, f.z); scene.add(g);
+  const ctx = { g, ly: (u, v) => heightAt(f.x + u, f.z + v) };
+  const post = texMat('wood', '#8a5a36'), lamp = mat(f.r.color, { emissive: f.r.color, emissiveIntensity: 0.9 });
+  for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2 + 0.2, u = Math.cos(a) * (FIELD_R + 0.6), v = Math.sin(a) * (FIELD_R + 0.6), y = ctx.ly(u, v);
+    mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 6), post, u, y + 1.1, v, g);
+    mesh(new THREE.OctahedronGeometry(0.32), lamp, u, y + 2.5, v, g).castShadow = false;
+    colliders.push({ x: f.x + u, z: f.z + v, r: 0.3 });
+  }
+  const ringMat = groundFX({ time: { value: 0 }, col: { value: new THREE.Color(f.r.color) } },
+    `uniform float time; uniform vec3 col; varying vec2 vP;
+    void main(){
+      float d = length(vP), a = atan(vP.y, vP.x);
+      float ring = smoothstep(0.35, 0.0, abs(d - ${(FIELD_R - 0.8).toFixed(1)})) * step(0.5, fract(a * 6.0 + time * 0.25));
+      float glow = smoothstep(${FIELD_R.toFixed(1)}, 0.0, d) * 0.08;
+      float al = ring * 0.85 + glow;
+      gl_FragColor = vec4(col * al, al);
+    }`);
+  drapedPlane(ctx, 0, 0, FIELD_R * 2 + 2, FIELD_R * 2 + 2, 28, ringMat);
+  animators.push((t) => { ringMat.uniforms.time.value = t; });
+  const el = document.createElement('div');
+  el.className = 'field-sign'; el.style.setProperty('--region', f.r.color);
+  el.innerHTML = `<i>採集場</i><b>${esc(f.name)}</b>`;
+  const o = new CSS2DObject(el); o.position.set(0, ctx.ly(0, 0) + 5, 0); g.add(o);
+  fieldSigns.push({ el, pos: new THREE.Vector3(f.x, ctx.ly(0, 0), f.z) });
+});
+
 /* ---------- 植被與岩石 ---------- */
 {
-  const count = isTouch ? 340 : 480;
+  const count = isTouch ? 520 : 780;
   const pts = [];
   let tries = 0;
   while (pts.length < count && tries < count * 25) {
     tries++;
-    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 108;
+    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * 145;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     const inf = terrainInfo(x, z);
-    if (inf.h < 1.5 || inf.pathW > 0.02) continue;
+    if (inf.h < 1.5 || inf.pathW > 0.02 || fields.some((f) => Math.hypot(x - f.x, z - f.z) < FIELD_R + 2.5)) continue; // 採集場留出空地（含樹冠）
     if (inf.nearD < inf.near.style.clear) continue;
     let bad = false;
     for (const r of regions) if (Math.hypot(x - r.approach.x, z - r.approach.z) < 7) { bad = true; break; }
@@ -1282,11 +1324,11 @@ regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
 
   // 岩石
   const rocks = [];
-  for (let k = 0; rocks.length < 90 && k < 3000; k++) {
-    const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
+  for (let k = 0; rocks.length < 140 && k < 4000; k++) {
+    const a = Math.random() * Math.PI * 2, d = 45 + Math.random() * 100;
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     const inf = terrainInfo(x, z);
-    if (inf.h < -0.5 || inf.h > 14 || inf.pathW > 0.02 || inf.nearD < 20 || !isClear(x, z, 1)) continue;
+    if (inf.h < -0.5 || inf.h > 14 || inf.pathW > 0.02 || inf.fieldW > 0 || inf.nearD < 20 || !isClear(x, z, 1)) continue;
     rocks.push({ x, z, h: inf.h });
   }
   const rockM = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: '#9b9387', flatShading: true }), rocks.length);
@@ -1311,7 +1353,7 @@ regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
       m.position.set((k - n / 2) * 3.6, Math.random() * 1.5, (Math.random() - 0.5) * 3); m.scale.y = 0.65;
       c.add(m);
     }
-    const a = (i / 13) * Math.PI * 2, d = 50 + Math.random() * 90;
+    const a = (i / 13) * Math.PI * 2, d = 70 + Math.random() * 120;
     c.userData = { a, d, y: 42 + Math.random() * 18, sp: 0.008 + Math.random() * 0.01 };
     scene.add(c); clouds.push(c);
   }
@@ -1845,7 +1887,7 @@ const player = new THREE.Group();
  * ========================================================================= */
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
-controls.maxPolarAngle = 1.32; controls.minDistance = 12; controls.maxDistance = 290;
+controls.maxPolarAngle = 1.32; controls.minDistance = 12; controls.maxDistance = 360;
 controls.target.set(0, 4, 0);
 controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.35;
 controls.update();
@@ -1969,7 +2011,7 @@ function updateExplore(dt) {
     mx *= k; mz *= k;
     const speed = 12 * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 1.7 : 1);
     let nx = p.x + mx * speed * dt, nz = p.z + mz * speed * dt;
-    const ok = (x, z) => heightAt(x, z) > 0.7 && Math.hypot(x, z) < 118;
+    const ok = (x, z) => heightAt(x, z) > 0.7 && Math.hypot(x, z) < 158;
     if (!ok(nx, nz)) { if (ok(nx, p.z)) nz = p.z; else if (ok(p.x, nz)) nx = p.x; else { nx = p.x; nz = p.z; } }
     for (const c of colliders) {
       const dx = nx - c.x, dz = nz - c.z, d = Math.hypot(dx, dz), min = c.r + 0.6;
@@ -2290,7 +2332,7 @@ function showToast(r, revealed = false) {
 
 /* 小地圖 */
 const mm = $('#minimap'), mctx = mm.getContext('2d');
-const MM = 336, WORLD_HALF = 122;
+const MM = 336, WORLD_HALF = 165;
 const toMap = (x, z) => [(x + WORLD_HALF) / (WORLD_HALF * 2) * MM, (z + WORLD_HALF) / (WORLD_HALF * 2) * MM];
 const mmBase = document.createElement('canvas'); mmBase.width = mmBase.height = MM;
 {
@@ -2315,6 +2357,11 @@ function drawMinimap() {
   mctx.save();
   mctx.beginPath(); mctx.arc(MM / 2, MM / 2, MM / 2 - 2, 0, Math.PI * 2); mctx.clip();
   mctx.drawImage(mmBase, 0, 0);
+  fields.forEach((f) => {
+    const [x, y] = toMap(f.x, f.z);
+    mctx.beginPath(); mctx.arc(x, y, FIELD_R / (WORLD_HALF * 2) * MM, 0, Math.PI * 2);
+    mctx.setLineDash([4, 4]); mctx.lineWidth = 2.5; mctx.strokeStyle = f.r.color; mctx.stroke(); mctx.setLineDash([]);
+  });
   regions.forEach((r) => {
     if (!isFogged(r)) return;
     const [x, y] = toMap(r.x, r.z), rad = (FOG_R * 1.15) / (WORLD_HALF * 2) * MM;
@@ -2492,6 +2539,20 @@ const sound = (() => {
   return { update, sfx, set, resumeIfWanted: () => { if (pref) set(true); } };
 })();
 
+/* 陰影跟著鏡頭焦點走：拉近時範圍小、陰影清楚；拉遠時涵蓋整座島 */
+scene.add(sunLight.target);
+const SUN_OFF = new THREE.Vector3(-90, 130, 70);
+function updateShadow() {
+  const focus = state.mode === 'explore' ? player.position : controls.target;
+  const sc = sunLight.shadow.camera;
+  const span = THREE.MathUtils.clamp(Math.ceil(camera.position.distanceTo(focus) * 0.9 / 20) * 20, 60, 190);
+  if (span !== sc.right) { sc.left = sc.bottom = -span; sc.right = sc.top = span; sc.updateProjectionMatrix(); }
+  const texel = span * 2 / sunLight.shadow.mapSize.x; // 對齊陰影貼圖像素，移動時不閃爍
+  const fx = Math.round(focus.x / texel) * texel, fz = Math.round(focus.z / texel) * texel;
+  sunLight.target.position.set(fx, 0, fz); sunLight.target.updateMatrixWorld();
+  sunLight.position.set(fx + SUN_OFF.x, SUN_OFF.y, fz + SUN_OFF.z);
+}
+
 /* 區域氛圍：鏡頭焦點靠近哪一區，霧色與天光就漸漸染上該區的色調 */
 const MOOD_COL = Object.fromEntries(Object.entries(MOOD).map(([id, m]) => [id, { fog: new THREE.Color(m.fog), hemi: new THREE.Color(m.hemi), sun: new THREE.Color(m.sun) }]));
 const moodBase = MOOD_COL.capital, moodCol = { fog: new THREE.Color(), hemi: new THREE.Color(), sun: new THREE.Color() };
@@ -2603,7 +2664,7 @@ function tick() {
     updateExplore(dt);
   } else {
     const tg = controls.target, d = Math.hypot(tg.x, tg.z);
-    if (d > 105) { tg.x *= 105 / d; tg.z *= 105 / d; }
+    if (d > 140) { tg.x *= 140 / d; tg.z *= 140 / d; }
     controls.update();
     const ground = heightAt(camera.position.x, camera.position.z) + 3;
     if (camera.position.y < ground) camera.position.y = ground;
@@ -2611,6 +2672,7 @@ function tick() {
 
   updateNPCs(t, dt);
   updateMood(dt);
+  updateShadow();
 
   // 依距離調整標籤
   const cp = camera.position;
@@ -2619,6 +2681,7 @@ function tick() {
     const d = cp.distanceTo(n.pos);
     n.label.classList.toggle('far', d > (state.mode === 'explore' ? 60 : 95));
   }
+  for (const s of fieldSigns) s.el.classList.toggle('far', cp.distanceTo(s.pos) > 120);
   for (const s of regionSigns) {
     const d = Math.hypot(focus.x - s.r.x, focus.z - s.r.z);
     s.el.classList.toggle('near', state.mode === 'explore' ? d < 30 : cp.distanceTo(s.pos) < 32);
