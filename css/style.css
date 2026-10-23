@@ -1,4 +1,4 @@
-/* 南應室研大陸 — 介面樣式
+/* 南應大室研大冒險 — 介面樣式
    Layout: 全螢幕 3D 地圖為底；黃銅刻印風格的 HUD 浮在四角；導師卡是攤開在桌上的羊皮紙檔案。
    單一夜色世界觀（刻意只有深色主題），所有顏色皆由下列 token 推導。 */
 :root {
@@ -82,18 +82,18 @@ button { cursor: pointer; }
 .region-sign b { font-family: var(--f-display); font-weight: 900; font-size: 19px; letter-spacing: .12em; color: var(--ink-light); }
 .region-sign i { font-style: normal; font-family: var(--f-rune); font-size: 9px; letter-spacing: .32em; color: var(--region, var(--brass)); }
 .region-sign.near { opacity: 0; pointer-events: none; }
-.region-sign .fog-tag { display: none; margin-top: 3px; font-family: var(--f-lore); font-size: 11px; color: #cdb6ff; letter-spacing: .08em; }
-.region-sign.fogged { border-color: #6b5a8f; background: linear-gradient(180deg, rgba(12,8,22,.92), rgba(12,8,22,.78)); }
+.region-sign .fog-tag { display: none; margin-top: 3px; font-family: var(--f-lore); font-size: 11px; color: #d4d7df; letter-spacing: .08em; }
+.region-sign.fogged { border-color: #8a8f9b; background: linear-gradient(180deg, rgba(40,43,51,.9), rgba(40,43,51,.76)); }
 .region-sign.fogged .fog-tag { display: block; }
 .region-sign.fogged.near { opacity: 1; pointer-events: auto; }
 .npc-label.fogged { opacity: 0 !important; pointer-events: none; }
 
 /* 圖鑑中仍在迷霧裡的導師 */
-.t-row.locked .avatar { background: #241c38; border-color: #4a3d6b; color: #8f7fb8; }
+.t-row.locked .avatar { background: #2e313a; border-color: #5b5f6b; color: #a9adb8; }
 .t-row.locked .who b { color: var(--ink-light-dim); letter-spacing: .2em; }
 .t-row.locked .who small { font-style: normal; }
-.region-block.locked > button i { background: #4a3d6b; }
-.region-block.locked > button small { color: #b7a2ec; }
+.region-block.locked > button i { background: #6b6f7a; }
+.region-block.locked > button small { color: #c3c7d0; }
 
 /* ---------- HUD ---------- */
 .plate {
@@ -116,7 +116,7 @@ button { cursor: pointer; }
   border: 1.5px solid var(--brass); transform: rotate(45deg); border-radius: 4px;
 }
 .crest span { transform: rotate(-45deg); font-family: var(--f-display); font-weight: 900; color: var(--brass); font-size: 15px; }
-.brand strong { display: block; font-family: var(--f-display); font-weight: 900; font-size: 18px; letter-spacing: .1em; }
+.brand strong { display: block; font-family: var(--f-display); font-weight: 900; font-size: 17px; letter-spacing: .06em; }
 .brand small { display: block; font-size: 11px; color: var(--ink-light-dim); letter-spacing: .04em; }
 
 .progress { padding: 9px 14px; min-width: 190px; display: grid; gap: 6px; }
@@ -178,6 +178,25 @@ button { cursor: pointer; }
 #toast small { display: block; font-family: var(--f-rune); letter-spacing: .5em; font-size: 12px; color: var(--brass); }
 #toast strong { display: block; font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 6vw, 52px); letter-spacing: .2em; }
 #toast span { display: block; font-family: var(--f-lore); font-size: 17px; color: var(--ink-light); }
+
+/* 灰霧提示 */
+#tip {
+  position: fixed; z-index: 19; left: 50%; top: calc(var(--top) + 64px); transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start;
+  padding: 12px 12px 12px 14px; border-color: #8a8f9b;
+  animation: tip-in .5s ease-out;
+}
+@keyframes tip-in { from { opacity: 0; transform: translate(-50%, -6px); } }
+#tip .fog-icon {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 40% 35%, #9a9ea9, #565a64 70%);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.12);
+}
+#tip strong { display: block; font-family: var(--f-display); font-size: 14px; color: var(--brass); margin-bottom: 2px; }
+#tip p { margin: 0; font-size: 13px; line-height: 1.65; color: var(--ink-light); }
+#tip p b { color: var(--brass); }
+#tip .icon-btn { width: 30px; height: 30px; }
 
 /* ---------- 圖鑑抽屜 ---------- */
 #codex {
@@ -345,7 +364,7 @@ button { cursor: pointer; }
 .title-card .eyebrow { font-family: var(--f-rune); font-weight: 600; font-size: 12px; letter-spacing: .5em; color: var(--brass); }
 .title-card h1 {
   margin: 0; font-family: var(--f-display); font-weight: 900;
-  font-size: clamp(40px, 11vw, 88px); letter-spacing: .12em; line-height: 1.05; padding-left: .12em;
+  font-size: clamp(34px, 9.6vw, 80px); letter-spacing: .08em; line-height: 1.1; padding-left: .08em;
   background: linear-gradient(180deg, #fff6df 20%, var(--brass) 95%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 4px 18px rgba(0,0,0,.6));
@@ -419,6 +438,7 @@ button { cursor: pointer; }
   .btn { padding: 8px 9px; font-size: 13px; }
   .btn svg { width: 15px; height: 15px; }
   #minimap-wrap { top: calc(var(--top) + 58px); }
+  #tip { top: auto; bottom: calc(var(--bot) + 150px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

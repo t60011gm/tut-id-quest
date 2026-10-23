@@ -1,5 +1,5 @@
 /* =========================================================================
- * 南應室研大陸 · 主程式
+ * 南應大室研大冒險 · 主程式
  * Three.js 建構的奇幻大陸：地形、六大區域地標、導師 NPC、
  * 「導覽模式」（點擊飛行）與「探險模式」（操控角色走動），以及所有介面。
  * 師資與區域內容請改 data/faculty.js，不需要動這個檔案。
@@ -800,7 +800,7 @@ regions.forEach((r) => {
 });
 
 /* =========================================================================
- * 黑霧：未探索的區域被迷霧籠罩，抵達後散去（王都一開始就是已探索）
+ * 灰霧：未探索的區域被迷霧籠罩，抵達後散去（王都一開始就是已探索）
  * ========================================================================= */
 const EXPLORE_KEY = 'tutIdQuest.explored.v1';
 const explored = new Set(['capital']);
@@ -812,8 +812,8 @@ function buildFog(r) {
   const baseY = heightAt(r.x, r.z);
   const g = new THREE.Group(); g.position.set(r.x, baseY, r.z); scene.add(g);
   const m = new THREE.MeshStandardMaterial({
-    color: '#15101f', emissive: '#2a1d47', emissiveIntensity: 0.4, flatShading: true,
-    roughness: 1, transparent: true, opacity: 0.94, depthWrite: false
+    color: '#565a64', emissive: '#2b2e35', emissiveIntensity: 0.25, flatShading: true,
+    roughness: 1, transparent: true, opacity: 0.55, depthWrite: false
   });
   const puffs = [];
   const N = isTouch ? 36 : 48;
@@ -829,7 +829,7 @@ function buildFog(r) {
     p.renderOrder = 2;
     g.add(p); puffs.push(p);
   }
-  const motes = sparkles(g, 60, '#9b7cff', FOG_R * 0.85, 1, 16, 0.75, 0.5);
+  const motes = sparkles(g, 50, '#d9dce4', FOG_R * 0.85, 1, 16, 0.6, 0.5);
   r.fog = { g, m, puffs, motes, revealAt: null };
 }
 regions.forEach((r) => { if (isFogged(r)) buildFog(r); });
@@ -844,7 +844,7 @@ animators.push((t, dt) => {
     } else {
       const k = Math.min(1, (performance.now() - f.revealAt) / 1900);
       const e = 1 - (1 - k) * (1 - k);
-      f.m.opacity = 0.94 * (1 - e);
+      f.m.opacity = 0.55 * (1 - e);
       f.motes.material.opacity = 1 - e;
       f.puffs.forEach((p) => {
         const b = p.userData.base;
@@ -1314,7 +1314,7 @@ $('#codex-list').addEventListener('click', (e) => {
 function updateHint() {
   const h = $('#hint');
   if (state.mode === 'tour') {
-    h.innerHTML = isTouch ? '單指旋轉 · 雙指縮放 · 點旗幟或名牌前往' : '拖曳旋轉 · 滾輪縮放 · 右鍵平移 · 點擊旗幟或名牌前往';
+    h.innerHTML = isTouch ? '單指旋轉 · 雙指縮放 · 點旗幟驅散灰霧' : '拖曳旋轉 · 滾輪縮放 · 右鍵平移 · 點擊旗幟驅散灰霧、點名牌拜訪導師';
   } else {
     h.innerHTML = isTouch ? '左下搖桿移動 · 拖曳畫面轉視角' : '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動 · <kbd>Shift</kbd> 奔跑 · 拖曳轉視角 · <kbd>E</kbd> 對話';
   }
@@ -1362,7 +1362,7 @@ function drawMinimap() {
     if (!isFogged(r)) return;
     const [x, y] = toMap(r.x, r.z), rad = (FOG_R * 1.15) / (WORLD_HALF * 2) * MM;
     const gr = mctx.createRadialGradient(x, y, rad * 0.35, x, y, rad);
-    gr.addColorStop(0, 'rgba(18,12,30,0.95)'); gr.addColorStop(1, 'rgba(18,12,30,0)');
+    gr.addColorStop(0, 'rgba(62,65,74,0.92)'); gr.addColorStop(1, 'rgba(62,65,74,0)');
     mctx.fillStyle = gr; mctx.beginPath(); mctx.arc(x, y, rad, 0, Math.PI * 2); mctx.fill();
   });
   regions.forEach((r) => {
@@ -1405,9 +1405,18 @@ mm.addEventListener('click', (e) => {
 $('#btn-apply').href = W.links.admissions;
 $('#cta-admissions').href = W.links.admissions;
 $('#cta-master').href = W.links.master;
+function showFogTip() {
+  const left = regions.filter(isFogged).length;
+  if (!left) return;
+  $('#tip-text').innerHTML = `還有 <b>${left}</b> 個區域被灰霧遮蔽，霧中的導師要驅散迷霧後才會現身。<br>點區域旗幟、在探險模式走近，或把鏡頭拉近，就能驅散迷霧。`;
+  const tip = $('#tip'); tip.hidden = false;
+  clearTimeout(showFogTip.timer); showFogTip.timer = setTimeout(() => { tip.hidden = true; }, 12000);
+}
+$('#tip-close').addEventListener('click', () => { $('#tip').hidden = true; });
 $('#btn-start').addEventListener('click', () => {
   $('#intro').hidden = true;
   state.started = true;
+  setTimeout(showFogTip, reduceMotion ? 0 : 2600);
   const hashId = decodeURIComponent(location.hash.slice(1));
   const target = faculty.find((f) => f.id === hashId);
   if (target) selectTeacher(target);
