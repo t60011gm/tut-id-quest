@@ -497,3 +497,141 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* =========================================================================
+ * 任務系統
+ * ========================================================================= */
+/* 導師名牌上的任務記號：! 可接、… 採集中、? 待試煉、★ 已通過 */
+.npc-label { position: relative; }
+.q-mark {
+  position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--f-display); font-weight: 900; font-size: 13px;
+  background: var(--brass); color: #2c2216; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+.q-mark[data-stage="1"] { background: #9fb3c8; }
+.q-mark[data-stage="2"] { background: #ffd36b; animation: q-bounce 1s ease-in-out infinite; }
+.q-mark[data-stage="3"] { background: var(--visited); color: #10301c; }
+@keyframes q-bounce { 50% { transform: translateY(-3px); } }
+
+/* 導師卡的任務區塊 */
+.sheet .quest { padding: 12px 14px; border: 1px dashed rgba(44,34,22,.3); border-left: 4px solid var(--region); background: rgba(255,255,255,.35); border-radius: 4px; }
+.sheet .quest p { margin: 0; font-size: 14px; line-height: 1.7; }
+.sheet .quest .q-line { font-family: var(--f-lore); font-size: 15px; color: #4a3a26; }
+.sheet .quest .q-hint { font-size: 13px; color: var(--ink-soft); }
+.sheet .quest .q-count { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--seal); }
+.q-btn {
+  justify-self: start; margin-top: 4px; padding: 7px 16px; border-radius: 6px; font-size: 14px; font-weight: 700;
+  border: 1px solid rgba(44,34,22,.35); background: #fbf5e6; color: var(--ink);
+}
+.q-btn:hover { border-color: var(--ink); }
+.q-btn.primary { background: var(--seal); border-color: var(--seal); color: #fff6e6; }
+.q-btn.primary:hover { filter: brightness(1.08); }
+
+/* 探險模式靠近小怪的提示（與 #prompt 同位置） */
+#qprompt {
+  position: fixed; z-index: 16; left: 50%; bottom: calc(var(--bot) + 64px); transform: translateX(-50%);
+  padding: 10px 18px; font-family: var(--f-lore); font-size: 16px; border-color: var(--brass);
+}
+#qprompt b { font-family: var(--f-display); color: var(--brass); }
+
+/* 任務通知 */
+#qtoast {
+  position: fixed; z-index: 21; left: 50%; top: calc(var(--top) + 64px); transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px)); padding: 10px 16px 12px; border-left: 4px solid var(--region);
+  display: grid; gap: 2px; pointer-events: none;
+}
+#qtoast.show { animation: say-in .3s ease-out; }
+#qtoast b { font-family: var(--f-display); font-size: 14px; color: var(--region); }
+#qtoast span { font-family: var(--f-lore); font-size: 16px; line-height: 1.6; color: var(--ink-light); }
+#qtoast small { font-size: 12.5px; color: var(--brass); }
+
+/* 進行中的任務追蹤 */
+#qtrack { position: fixed; z-index: 14; left: var(--gut); top: calc(var(--top) + 64px); display: grid; gap: 6px; max-width: 300px; }
+#qtrack button {
+  display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px; text-align: left;
+  padding: 7px 12px; border-radius: 8px; border: 1px solid var(--brass-dim); background: var(--plate); color: var(--ink-light);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+#qtrack button:hover { border-color: var(--brass); }
+#qtrack i { width: 8px; height: 8px; background: var(--region); transform: rotate(45deg); }
+#qtrack b { font-family: var(--f-display); font-size: 13px; }
+#qtrack span { font-size: 12px; color: var(--ink-light-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 淨化小遊戲 */
+#purify {
+  position: fixed; z-index: 35; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(300px, calc(100vw - 32px)); padding: 16px 16px 12px; display: grid; justify-items: center; gap: 2px;
+  border-color: var(--region); touch-action: manipulation; user-select: none; cursor: pointer;
+}
+#purify small { font-size: 11px; letter-spacing: .3em; color: var(--region); }
+#purify b { font-family: var(--f-display); font-size: 20px; color: var(--ink-light); }
+#purify canvas { width: 220px; height: 220px; max-width: 100%; }
+#purify .pf-msg { margin: 0; font-size: 14px; color: var(--ink-light); text-align: center; min-height: 1.5em; }
+#purify .pf-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; color: var(--ink-light-dim); }
+
+/* 試煉視窗（羊皮紙，與導師卡同一風格） */
+#trial { z-index: 41; }
+#trial .trial-sheet {
+  position: relative; width: min(760px, 100%); max-height: min(90vh, 100%); overflow-y: auto;
+  background: radial-gradient(120% 90% at 50% 40%, rgba(255,255,255,.25), transparent 70%), var(--parchment);
+  color: var(--ink); border-radius: 4px; padding: 26px 28px 24px;
+  border-top: 6px solid var(--region); box-shadow: 0 30px 80px rgba(0,0,0,.5);
+  animation: unroll .45s cubic-bezier(.2,.9,.25,1);
+}
+.trial-title { margin: 0 40px 14px 0; font-family: var(--f-display); font-weight: 900; font-size: 24px; letter-spacing: .06em; line-height: 1.3; }
+.trial-body { display: grid; gap: 12px; }
+.trial-intro { margin: 0; font-family: var(--f-lore); font-size: 17px; line-height: 1.75; color: #4a3a26; }
+.trial-rules { margin: 0; font-size: 14px; line-height: 1.7; color: var(--ink-soft); padding: 10px 12px; background: rgba(255,255,255,.4); border-radius: 4px; }
+.trial-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 6px; }
+.trial-wip { text-align: center; font-family: var(--f-lore); font-size: 18px; margin: 20px 0 6px; }
+.trial-win { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.trial-win h3 { margin: 4px 0 0; font-family: var(--f-display); font-size: 22px; color: var(--seal); }
+.knowledge { justify-self: stretch; text-align: left; padding: 12px 16px; background: #fbf5e6; border: 1px solid var(--parchment-edge); border-left: 4px solid var(--region); border-radius: 4px; }
+.knowledge h4 { margin: 0 0 6px; font-family: var(--f-display); font-size: 15px; }
+.knowledge ul { margin: 0; padding-left: 1.2em; font-size: 14px; line-height: 1.75; }
+
+/* 徽章 */
+.badge-medal {
+  width: 64px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; text-align: center; position: relative;
+  background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55), transparent 45%), var(--region);
+  border: 3px solid #e2b45c; box-shadow: 0 0 0 2px rgba(0,0,0,.25), 0 4px 10px rgba(0,0,0,.3);
+  font-family: var(--f-display); font-weight: 900; font-size: 11px; line-height: 1.15; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.5);
+}
+.badge-medal span { padding: 0 6px; }
+.badge-medal small { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--f-ui); font-weight: 500; font-size: 11px; color: var(--ink-light-dim); text-shadow: none; }
+.badge-medal.locked { background: #2e313a; border-color: #5b5f6b; color: #8a8f9b; text-shadow: none; font-size: 18px; }
+.badge-medal.big { width: 110px; font-size: 17px; animation: medal-in .6s cubic-bezier(.2,1.4,.4,1); }
+@keyframes medal-in { from { transform: scale(.3) rotate(-30deg); opacity: 0; } }
+
+/* 圖鑑分頁 */
+.codex-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.codex-tabs button { padding: 8px 6px; border-radius: 8px; border: 1px solid var(--brass-dim); background: transparent; color: var(--ink-light-dim); font-weight: 700; font-size: 13.5px; }
+.codex-tabs button[aria-selected="true"] { background: var(--brass); border-color: var(--brass); color: #1d1a18; }
+#codex[data-tab="quests"] .search, #codex[data-tab="quests"] .chips, #codex[data-tab="quests"] .codex-list { display: none; }
+#codex:not([data-tab="quests"]) .quest-log { display: none; }
+.quest-log { flex: 1; overflow-y: auto; display: grid; gap: 12px; align-content: start; margin-right: -8px; padding-right: 8px; }
+.quick-toggle { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--brass-dim); border-radius: 8px; cursor: pointer; }
+.quick-toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--brass); }
+.quick-toggle span { font-size: 12.5px; line-height: 1.6; color: var(--ink-light-dim); }
+.quick-toggle b { display: block; font-size: 14px; color: var(--ink-light); }
+.log-head { margin: 4px 0 0; display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-display); font-size: 16px; letter-spacing: .1em; }
+.log-head small { font-family: var(--f-ui); font-size: 12px; color: var(--ink-light-dim); }
+.badge-wall { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px 8px; justify-items: center; padding: 6px 0 16px; }
+.badge-wall .badge-medal { width: 58px; }
+.quest-rows { display: grid; gap: 4px; }
+.quest-row { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: center; text-align: left; padding: 7px 8px; border-radius: 6px; border: 1px solid transparent; background: none; color: var(--ink-light); }
+.quest-row:hover { border-color: var(--brass-dim); background: rgba(255,255,255,.04); }
+.quest-row i { width: 8px; height: 8px; background: var(--region); transform: rotate(45deg); }
+.quest-row b { font-family: var(--f-display); font-size: 14px; }
+.quest-row span { justify-self: end; font-size: 12px; color: var(--ink-light-dim); }
+.quest-row[data-stage="2"] span { color: #ffd36b; }
+.quest-row[data-stage="3"] span { color: var(--visited); }
+
+@media (max-width: 720px) {
+  #qprompt { bottom: calc(var(--bot) + 120px); font-size: 14px; }
+  #qtrack { top: calc(var(--top) + 58px); max-width: calc(100vw - 150px); }
+  #qtrack button:nth-child(n+2) { display: none; }
+  #qtoast { top: auto; bottom: calc(var(--bot) + 230px); }
+  #trial .trial-sheet { padding: 22px 16px 18px; }
+  .trial-title { font-size: 19px; }
+}

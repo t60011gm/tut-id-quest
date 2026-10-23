@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
 
@@ -67,6 +67,9 @@
 <div id="hint" class="plate"></div>
 <div id="prompt" class="plate" hidden></div>
 <div id="dialog" class="plate" aria-live="polite" hidden></div>
+<div id="qprompt" class="plate" hidden></div>
+<div id="qtoast" class="plate" role="status" hidden></div>
+<div id="qtrack" aria-label="進行中的任務" hidden></div>
 <aside id="tip" class="plate" role="status" hidden>
   <span class="fog-icon" aria-hidden="true"></span>
   <div><strong>白霧中的區域尚未探索</strong><p id="tip-text"></p></div>
@@ -78,12 +81,16 @@
 <button id="btn-interact" type="button" hidden disabled>對話</button>
 
 <!-- 導師圖鑑 -->
-<aside id="codex" aria-label="導師圖鑑" aria-hidden="true" inert>
+<aside id="codex" aria-label="導師圖鑑" aria-hidden="true" inert data-tab="roster">
   <div class="drawer-head">
     <h2>導師圖鑑</h2>
     <button class="icon-btn" id="codex-close" type="button" aria-label="關閉圖鑑">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
     </button>
+  </div>
+  <div class="codex-tabs" id="codex-tabs" role="tablist">
+    <button type="button" role="tab" data-tab="roster" aria-selected="true">導師名冊</button>
+    <button type="button" role="tab" data-tab="quests" aria-selected="false">任務與徽章</button>
   </div>
   <label class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -91,8 +98,26 @@
   </label>
   <div class="chips" id="codex-chips"></div>
   <div class="codex-list" id="codex-list"></div>
+  <div class="quest-log" id="quest-log"></div>
   <button class="reset-btn" id="btn-reset" type="button">重新開始冒險</button>
 </aside>
+
+<!-- 淨化小遊戲 -->
+<div id="purify" class="plate" role="dialog" aria-label="淨化" hidden>
+  <button class="icon-btn pf-close" type="button" aria-label="取消淨化"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <small>淨化</small><b class="pf-name"></b>
+  <canvas width="320" height="320"></canvas>
+  <p class="pf-msg"></p>
+</div>
+
+<!-- 導師試煉 -->
+<div id="trial" class="overlay" role="dialog" aria-modal="true" aria-labelledby="trial-title" hidden>
+  <article class="sheet trial-sheet">
+    <button class="icon-btn close trial-close" type="button" aria-label="離開試煉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <h3 class="trial-title" id="trial-title"></h3>
+    <div class="trial-body"></div>
+  </article>
+</div>
 
 <!-- 導師卡 -->
 <div id="card" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="card-name">
@@ -137,6 +162,7 @@
 </div>
 
 <script src="data/faculty.js?v=7"></script>
+<script src="data/quests.js?v=1"></script>
 <script type="importmap">
 {
   "imports": {
@@ -146,6 +172,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=8"></script>
+<script type="module" src="js/main.js?v=9"></script>
 </body>
 </html>

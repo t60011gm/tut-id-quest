@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { initQuests, QUEST_KEY } from './quests.js?v=1';
 
 const W = window.WORLD;
 const $ = (s) => document.querySelector(s);
@@ -1724,7 +1725,7 @@ function updateNPCs(t, dt) {
     if (b < 1.4) { const k = b / 1.4; n.burst.visible = true; n.burst.scale.set(1 + k * 0.8, 0.4 + k * 1.2, 1 + k * 0.8); n.burst.position.y = 1.75 + k * 1.5; n.burst.material.opacity = 0.6 * (1 - k); }
     else if (n.burst.visible) n.burst.visible = false;
   }
-  const show = talker && !state.card && !state.flying && fogTip.hidden;
+  const show = talker && !state.card && !state.busy && !state.flying && fogTip.hidden;
   if (show) {
     const key = talker.f.id + ':' + talker.line;
     if (dialog.dataset.key !== key) {
@@ -2004,7 +2005,7 @@ function updateExplore(dt) {
   const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw);
   let mx = -sy * -iz + cy * ix, mz = -cy * -iz - sy * ix;
   const len = Math.hypot(mx, mz);
-  const moving = len > 0.05 && !state.card;
+  const moving = len > 0.05 && !state.card && !state.busy;
   const p = player.position;
   if (moving) {
     const k = Math.min(1, len) / len;
@@ -2044,10 +2045,20 @@ function updateExplore(dt) {
       pr.innerHTML = isTouch ? `點「對話」拜訪 <b>${esc(near.f.name)}</b>` : `按 <b>E</b> 與 <b>${esc(near.f.name)}</b> 對話`;
       pr.hidden = false;
     } else pr.hidden = true;
-    $('#btn-interact').disabled = !near;
+    syncInteract();
   }
 }
-function interact() { if (state.mode === 'explore' && state.nearNPC && !state.card) openCard(state.nearNPC.f); }
+/* 手機互動鈕：靠近導師是「對話」，靠近任務小怪是「淨化」 */
+function syncInteract() {
+  const b = $('#btn-interact'), m = quests && quests.nearMonster;
+  b.disabled = !state.nearNPC && !m;
+  b.textContent = m && !state.nearNPC ? '淨化' : '對話';
+}
+function interact() {
+  if (state.mode !== 'explore' || state.card || state.busy) return;
+  if (state.nearNPC) openCard(state.nearNPC.f);
+  else quests.interact();
+}
 
 /* ---------- 輸入 ---------- */
 window.addEventListener('keydown', (e) => {
@@ -2089,6 +2100,7 @@ function pick(e) {
   const rect = dom.getBoundingClientRect();
   ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
   ray.setFromCamera(ndc, camera);
+  if (state.busy || quests.pick(ray)) return; // 點到任務小怪就開始淨化
   const hit = ray.intersectObjects(hitTargets, false)[0];
   if (hit) selectTeacher(hit.object.userData.f);
 }
@@ -2189,6 +2201,7 @@ function openCard(f) {
         <section class="sect"><h4>專長技能</h4><div class="skills">${f.fields.map((x) => `<span class="skill">${esc(x)}</span>`).join('')}</div></section>
         ${f.courses?.length ? `<section class="sect"><h4>傳授技能書</h4><ul class="tomes">${f.courses.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
         ${f.feats?.length ? `<section class="sect"><h4>冒險紀錄</h4><ul class="feats">${f.feats.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
+        ${quests.cardHTML(f)}
         ${f.email || f.url ? `<div class="contact">
           ${f.email ? `<span class="mail">${esc(f.email)}</span><button class="copy" type="button">複製信箱</button>` : ''}
           ${f.url ? `<a class="site" href="${esc(f.url)}" target="_blank" rel="noopener">${f.adjunct ? '相關資料' : '個人網站'} ↗</a>` : ''}
@@ -2201,6 +2214,7 @@ function openCard(f) {
       <button type="button" data-nav="1">下一位導師 →</button>
     </nav>`;
   fixBrokenPhotos(sheet);
+  quests.bindCard(sheet, f);
   sheet.querySelector('.close').addEventListener('click', closeCard);
   sheet.querySelector('.copy')?.addEventListener('click', (e) => {
     const btn = e.currentTarget, mail = sheet.querySelector('.mail');
@@ -2242,6 +2256,12 @@ function closeCodexIfNarrow() { if (window.innerWidth < 900) toggleCodex(false);
 $('#btn-codex').addEventListener('click', () => toggleCodex());
 $('#codex-close').addEventListener('click', () => toggleCodex(false));
 
+// 圖鑑分頁：導師名冊／任務日誌
+$('#codex-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  $('#codex').dataset.tab = b.dataset.tab;
+  $('#codex-tabs').querySelectorAll('button').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+});
 const chips = $('#codex-chips');
 chips.innerHTML = `<button type="button" data-r="" class="on">全部</button>` + regions.map((r) => `<button type="button" data-r="${r.id}">${esc(r.name)}</button>`).join('');
 chips.addEventListener('click', (e) => {
@@ -2436,7 +2456,7 @@ $('#btn-start').addEventListener('click', () => {
       clearTimeout(timer); timer = setTimeout(() => { armed = false; btn.textContent = '重新開始冒險'; }, 4000);
       return;
     }
-    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(EXPLORE_KEY); } catch (e) { /* 忽略 */ }
+    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(EXPLORE_KEY); localStorage.removeItem(QUEST_KEY); } catch (e) { /* 忽略 */ }
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 忽略 */ }
     location.reload();
   });
@@ -2517,6 +2537,8 @@ const sound = (() => {
     if (name === 'card') { tone(784, t, 0.5, 0.12); tone(1174.7, t + 0.08, 0.6, 0.1); }
     else if (name === 'reveal') burst(t, 1.3, 300, 0.5, master, 2600);
     else if (name === 'visit') [523.3, 659.3, 784, 1046.5].forEach((f, i) => tone(f, t + i * 0.07, 0.6, 0.1, 'triangle'));
+    else if (name === 'purify') { burst(t, 0.4, 1800, 0.25, master, 5000); tone(1318.5, t + 0.05, 0.5, 0.1); tone(1760, t + 0.12, 0.6, 0.08); }
+    else if (name === 'miss') tone(196, t, 0.25, 0.12, 'square');
   }
   const btn = $('#btn-sound');
   function set(v) {
@@ -2644,11 +2666,19 @@ function mergeStatic() {
 }
 const mergeInfo = mergeStatic();
 
+/* 任務系統（js/quests.js）：在合併靜態模型之後建立，小怪才不會被合併 */
+const quests = initQuests({
+  scene, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
+  flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract
+});
+
 const clock = new THREE.Clock();
 let firstFrame = true;
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
+  // 導師卡或試煉視窗蓋住畫面時，背後只是模糊背景：暫停 3D 渲染，省電也讓小遊戲更順
+  if ((state.card || state.paused) && !state.flying && !firstFrame) { requestAnimationFrame(tick); return; }
   if (!reduceMotion) animators.forEach((fn) => fn(t, dt));
   else if (firstFrame) animators.forEach((fn) => fn(0, 0));
 
@@ -2671,6 +2701,7 @@ function tick() {
   }
 
   updateNPCs(t, dt);
+  quests.update(t, dt);
   updateMood(dt);
   updateShadow();
 
@@ -2717,4 +2748,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo };
+window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo, quests };

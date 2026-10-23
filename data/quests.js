@@ -12,7 +12,8 @@
  *   settings.count / quickCount   第一階段收集數量（一般／快速模式）
  *   teachers[老師 id]
  *     badge     徽章名稱
- *     stage1    monster 小怪、item 道具、lines 對話（accept 接任務、hint 提示、done 收集完成）
+ *     stage1    monster 小怪（shape 外型：blob 史萊姆／cube 方塊／sprite 精靈／cloud 霧團／golem 魔像／bug 蟲；color 顏色）、
+ *               item 道具、lines 對話（accept 接任務、hint 提示、done 收集完成）
  *     stage2    game 小遊戲類型、title 試煉名稱、intro 開場白、rules 玩法說明、
  *               rounds 題目（含答案）、win 通關台詞、knowledge 知識小卡
  * ========================================================================= */
@@ -27,7 +28,7 @@ window.QUESTS = {
     "huang-jiao-yi": {
       badge: "網絡之眼",
       stage1: {
-        monster: { name: "孤島史萊姆", desc: "跟誰都沒有連線的小史萊姆，抱著別人的人脈信物不放。" },
+        monster: { name: "孤島史萊姆", shape: "blob", color: "#ffd36b", desc: "跟誰都沒有連線的小史萊姆，抱著別人的人脈信物不放。" },
         item: { name: "人脈信物", desc: "代表一段人際連結的信物。" },
         lines: {
           accept: "每一段人際連結都是一條線。到王都近郊把孤島史萊姆帶回網路裡，收回人脈信物吧！",
@@ -78,7 +79,7 @@ window.QUESTS = {
     "feng-yi-ming": {
       badge: "工序大師",
       stage1: {
-        monster: { name: "工期拖延怪", desc: "專門把材料藏起來、讓工程延宕的小怪。" },
+        monster: { name: "工期拖延怪", shape: "golem", color: "#b58b5a", desc: "專門把材料藏起來、讓工程延宕的小怪。" },
         item: { name: "建材樣品", desc: "磁磚、木皮、油漆、燈具、五金等樣品。" },
         lines: {
           accept: "工地缺料了！工期拖延怪把建材樣品藏在王都近郊，去把它們搶回來。",
@@ -118,7 +119,7 @@ window.QUESTS = {
     "lin-chieh-jen": {
       badge: "生成之心",
       stage1: {
-        monster: { name: "雜訊蟲", desc: "不停閃爍的方塊蟲，把提示詞咬得支離破碎。" },
+        monster: { name: "雜訊蟲", shape: "cube", color: "#3ee6ff", desc: "不停閃爍的方塊蟲，把提示詞咬得支離破碎。" },
         item: { name: "提示詞碎片", desc: "寫著風格、色調、材質、光線的關鍵字。" },
         lines: {
           accept: "雜訊蟲把提示詞咬碎了！到雜訊林地把碎片收回來，我們來生成一個空間。",
@@ -157,7 +158,7 @@ window.QUESTS = {
     "hsu-hao": {
       badge: "參數之鑰",
       stage1: {
-        monster: { name: "斷線精靈", desc: "會把節點之間的連線剪斷的小精靈。" },
+        monster: { name: "斷線精靈", shape: "sprite", color: "#c3adff", desc: "會把節點之間的連線剪斷的小精靈。" },
         item: { name: "參數節點", desc: "矩形、移動複製、旋轉、放樣、數字滑桿等節點。" },
         lines: {
           accept: "斷線精靈把參數節點偷走了！到雜訊林地把它們找回來，我們來接一座參數化的塔。",
@@ -201,7 +202,7 @@ window.QUESTS = {
     "chen-nien-tsu": {
       badge: "清新之息",
       stage1: {
-        monster: { name: "汙染霧團", desc: "甲醛霧與二氧化碳雲，躲在高地上看不見。" },
+        monster: { name: "汙染霧團", shape: "cloud", color: "#8a8f9b", desc: "甲醛霧與二氧化碳雲，躲在高地上看不見。" },
         item: { name: "感測晶片", desc: "能量測空氣品質的小晶片。" },
         lines: {
           accept: "空氣汙染看不見，但會影響每一口呼吸。帶著偵測器到汙染高地，找出汙染霧團並淨化它們。",
@@ -237,7 +238,7 @@ window.QUESTS = {
     "huang-kun-chih": {
       badge: "循環之環",
       stage1: {
-        monster: { name: "廢料魔像", desc: "由裝修廢料堆成的魔像，身上卡著各種建材。" },
+        monster: { name: "廢料魔像", shape: "golem", color: "#8c7a66", desc: "由裝修廢料堆成的魔像，身上卡著各種建材。" },
         item: { name: "廢建材", desc: "木料、紅磚、玻璃、鋼材、石膏板、塑膠。" },
         lines: {
           accept: "建材的下一輩子，從拆下來那一刻就決定了。到汙染高地拆解廢料魔像，把廢建材回收回來。",
@@ -284,7 +285,7 @@ window.QUESTS = {
     "chiang-po-hung": {
       badge: "積層之冠",
       stage1: {
-        monster: { name: "卡料小怪", desc: "躲在 3D 印表機裡，把線材纏成一團。" },
+        monster: { name: "卡料小怪", shape: "bug", color: "#f28c28", desc: "躲在 3D 印表機裡，把線材纏成一團。" },
         item: { name: "線材捲", desc: "3D 列印用的塑料線材。" },
         lines: {
           accept: "印表機又卡料了！到木料堆置場把卡料小怪清出來，取回線材捲。",
@@ -313,7 +314,7 @@ window.QUESTS = {
     "chen-kuan-fan": {
       badge: "構築之印",
       stage1: {
-        monster: { name: "白蟻小怪", desc: "啃食木構件的小白蟻，偷走了榫卯構件。" },
+        monster: { name: "白蟻小怪", shape: "bug", color: "#f3e6cc", desc: "啃食木構件的小白蟻，偷走了榫卯構件。" },
         item: { name: "榫卯構件", desc: "榫頭與卯眼，木構造接合的關鍵。" },
         lines: {
           accept: "白蟻偷走了榫卯構件！到木料堆置場把它們找回來，我們來搭一座站得住的木構架。",
@@ -348,7 +349,7 @@ window.QUESTS = {
     "chang-yi-fen": {
       badge: "社造之心",
       stage1: {
-        monster: { name: "冷漠霧靈", desc: "讓人不想說話的霧靈，遮住了居民的心聲。" },
+        monster: { name: "冷漠霧靈", shape: "cloud", color: "#9fb3c8", desc: "讓人不想說話的霧靈，遮住了居民的心聲。" },
         item: { name: "社區心願卡", desc: "居民寫下的願望。" },
         lines: {
           accept: "社區的事要大家一起來。到老街巷弄淨化冷漠霧靈，把居民的心願卡收回來。",
@@ -384,7 +385,7 @@ window.QUESTS = {
     "hsu-lu-li": {
       badge: "商域之鑰",
       stage1: {
-        monster: { name: "預算吞噬怪", desc: "吃掉專案文件和預算的小怪。" },
+        monster: { name: "預算吞噬怪", shape: "blob", color: "#46b35b", desc: "吃掉專案文件和預算的小怪。" },
         item: { name: "專案文件", desc: "平面圖、色票、報價單、合約、施工照片。" },
         lines: {
           accept: "預算吞噬怪把專案文件吃掉了！到老街巷弄把文件搶回來，案子才能繼續。",
@@ -421,7 +422,7 @@ window.QUESTS = {
     "lien-tang-hsuan": {
       badge: "識別之紋",
       stage1: {
-        monster: { name: "褪色怪", desc: "會把品牌吸成灰色的小怪。" },
+        monster: { name: "褪色怪", shape: "sprite", color: "#a8a8a8", desc: "會把品牌吸成灰色的小怪。" },
         item: { name: "品牌元素", desc: "標誌、標準色、標準字、輔助圖形、標語。" },
         lines: {
           accept: "褪色怪把品牌的顏色都吸走了！到褪色草原把品牌元素收回來。",
@@ -463,7 +464,7 @@ window.QUESTS = {
     "wu-wan-jung": {
       badge: "風格之眼",
       stage1: {
-        monster: { name: "混搭怪", desc: "把各種風格亂湊在一起的小怪。" },
+        monster: { name: "混搭怪", shape: "cube", color: "#e05d8c", desc: "把各種風格亂湊在一起的小怪。" },
         item: { name: "風格靈感", desc: "布料、色票、燈飾、植栽、木材、陶器。" },
         lines: {
           accept: "混搭怪把風格搞亂了！到褪色草原把風格靈感收回來。",

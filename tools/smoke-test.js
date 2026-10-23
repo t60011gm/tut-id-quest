@@ -94,6 +94,25 @@ async function run(browser, name, opts) {
   const perf = await page.evaluate(() => ({ merged: window.__quest.mergeInfo, calls: window.__quest.renderer.info.render.calls }));
   check('靜態模型合併', perf.merged.after > 0 && perf.merged.after < perf.merged.before, `${perf.merged.before} → ${perf.merged.after} 個，draw call ${perf.calls}`);
 
+  // 任務：接任務 → 小怪出現 → 收集完成 → 進入試煉
+  await page.evaluate(() => { const q = window.__quest; q.openCard(q.faculty.find((f) => f.id === 'huang-jiao-yi')); });
+  await page.waitForTimeout(600);
+  await page.click('[data-q="accept"]');
+  await page.waitForTimeout(400);
+  const spawned = await page.evaluate(() => window.__quest.quests.debug.monsters());
+  await page.keyboard.press('Escape');
+  check('接任務後出現小怪', spawned > 0, `${spawned} 隻`);
+  const stage = await page.evaluate(() => {
+    const d = window.__quest.quests.debug;
+    while (d.collectOne('huang-jiao-yi'));
+    return d.save().t['huang-jiao-yi'].stage;
+  });
+  check('收集完成進入試煉階段', stage === 2);
+  await page.evaluate(() => { const q = window.__quest; q.quests.openTrial(q.faculty.find((f) => f.id === 'huang-jiao-yi')); });
+  await page.waitForTimeout(400);
+  check('試煉視窗開啟', await page.evaluate(() => !document.querySelector('#trial').hidden));
+  await page.keyboard.press('Escape');
+
   // 探險模式
   await page.evaluate(() => window.__quest.setMode('explore'));
   await page.waitForTimeout(1500);
