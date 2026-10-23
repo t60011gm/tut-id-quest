@@ -1,4 +1,4 @@
-/* 南應大室研大冒險 — 介面樣式
+/* 南應大室研所大冒險 — 介面樣式
    Layout: 全螢幕 3D 地圖為底；黃銅刻印風格的 HUD 浮在四角；導師卡是攤開在桌上的羊皮紙檔案。
    單一夜色世界觀（刻意只有深色主題），所有顏色皆由下列 token 推導。 */
 :root {
@@ -83,7 +83,7 @@ button { cursor: pointer; }
 .region-sign i { font-style: normal; font-family: var(--f-rune); font-size: 9px; letter-spacing: .32em; color: var(--region, var(--brass)); }
 .region-sign.near { opacity: 0; pointer-events: none; }
 .region-sign .fog-tag { display: none; margin-top: 3px; font-family: var(--f-lore); font-size: 11px; color: #d4d7df; letter-spacing: .08em; }
-.region-sign.fogged { border-color: #8a8f9b; background: linear-gradient(180deg, rgba(40,43,51,.9), rgba(40,43,51,.76)); }
+.region-sign.fogged { border-color: #e6e8ee; background: linear-gradient(180deg, rgba(40,43,51,.9), rgba(40,43,51,.76)); }
 .region-sign.fogged .fog-tag { display: block; }
 .region-sign.fogged.near { opacity: 1; pointer-events: auto; }
 .npc-label.fogged { opacity: 0 !important; pointer-events: none; }
@@ -179,18 +179,18 @@ button { cursor: pointer; }
 #toast strong { display: block; font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 6vw, 52px); letter-spacing: .2em; }
 #toast span { display: block; font-family: var(--f-lore); font-size: 17px; color: var(--ink-light); }
 
-/* 灰霧提示 */
+/* 白霧提示 */
 #tip {
   position: fixed; z-index: 19; left: 50%; top: calc(var(--top) + 64px); transform: translateX(-50%);
   width: min(520px, calc(100vw - 32px));
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start;
-  padding: 12px 12px 12px 14px; border-color: #8a8f9b;
+  padding: 12px 12px 12px 14px; border-color: #e6e8ee;
   animation: tip-in .5s ease-out;
 }
 @keyframes tip-in { from { opacity: 0; transform: translate(-50%, -6px); } }
 #tip .fog-icon {
   width: 34px; height: 34px; border-radius: 50%; flex: none;
-  background: radial-gradient(circle at 40% 35%, #9a9ea9, #565a64 70%);
+  background: radial-gradient(circle at 40% 35%, #ffffff 15%, rgba(255,255,255,.35) 70%);
   box-shadow: 0 0 0 2px rgba(255,255,255,.12);
 }
 #tip strong { display: block; font-family: var(--f-display); font-size: 14px; color: var(--brass); margin-bottom: 2px; }
@@ -369,6 +369,11 @@ button { cursor: pointer; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 4px 18px rgba(0,0,0,.6));
 }
+/* 標題固定兩行：「南應大室研所」／「大冒險」 */
+.title-card h1.title { font-size: clamp(40px, 12vw, 80px); line-height: 1.12; }
+.title-card h1.title span { display: block; }
+.title-card .sub span { display: inline-block; }
+@media (max-width: 720px) { .title-card .sub span { display: block; } .title-card .sub .sep { display: none; } }
 .title-card .sub { margin: 0; font-size: 15px; color: var(--ink-light); letter-spacing: .06em; }
 .title-card .lore { margin: 0; font-family: var(--f-lore); font-size: 17px; line-height: 1.85; color: var(--ink-light); max-width: 34em; text-wrap: pretty; }
 .title-card .lore b { color: var(--brass); }
@@ -439,6 +444,9 @@ button { cursor: pointer; }
   .btn svg { width: 15px; height: 15px; }
   #minimap-wrap { top: calc(var(--top) + 58px); }
   #tip { top: auto; bottom: calc(var(--bot) + 150px); }
+  .title-card .eyebrow { letter-spacing: .28em; }
+  /* 說明文字只在標點處換行，避免單字落到下一行 */
+  .title-card .lore { font-size: 15px; word-break: keep-all; }
 }
 
 @media (prefers-reduced-motion: reduce) {

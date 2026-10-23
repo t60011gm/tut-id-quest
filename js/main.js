@@ -1,5 +1,5 @@
 /* =========================================================================
- * 南應大室研大冒險 · 主程式
+ * 南應大室研所大冒險 · 主程式
  * Three.js 建構的奇幻大陸：地形、六大區域地標、導師 NPC、
  * 「導覽模式」（點擊飛行）與「探險模式」（操控角色走動），以及所有介面。
  * 師資與區域內容請改 data/faculty.js，不需要動這個檔案。
@@ -17,14 +17,18 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 /* ---------- 世界常數 ---------- */
 const ISLAND_R = 112;
 const REGION_DIST = 64;
-const RUNE = {
-  capital: 'THE CAPITAL', forest: 'FOREST OF CODE', valley: 'VALE OF WINDS',
-  workshop: "ARTISANS' HAMLET", ruins: 'ANCIENT RUINS', plateau: 'CHROMA PLATEAU'
+/* 各區域的場景設定；新增區域時在這裡補一筆，並在 BUILDERS 加地標函式。
+ *   rune 旗幟英文　ground 地面色　foliage 樹葉色　floor 平台高度
+ *   flat 整平範圍 [外緣, 內緣]　clear 植被淨空半徑　signY 旗幟高度 */
+const STYLE = {
+  capital:  { rune: 'THE CAPITAL',       ground: '#93c45f', foliage: '#4f8f45', floor: 3.2, flat: [27, 16], clear: 27, signY: 32 },
+  forest:   { rune: 'FOREST OF CODE',    ground: '#2f8a72', foliage: '#2a6e66', floor: 3.0, flat: [22, 10], clear: 21, signY: 21 },
+  valley:   { rune: 'VALE OF WINDS',     ground: '#86c25a', foliage: '#5e9c3e', floor: 2.4, flat: [17, 10], clear: 14 },
+  workshop: { rune: "ARTISANS' HAMLET",  ground: '#b9a066', foliage: '#c9863e', floor: 2.8, flat: [22, 15], clear: 24 },
+  ruins:    { rune: 'ANCIENT RUINS',     ground: '#9b95a9', foliage: '#7b8a5e', floor: 3.6, flat: [22, 15], clear: 24 },
+  plateau:  { rune: 'CHROMA PLATEAU',    ground: '#d98fb2', foliage: '#e7a3c3', floor: 11,  flat: [30, 21], clear: 27 }
 };
-const GROUND = { capital: '#93c45f', forest: '#2f8a72', valley: '#86c25a', workshop: '#b9a066', ruins: '#9b95a9', plateau: '#d98fb2' };
-const FOLIAGE = { capital: '#4f8f45', forest: '#2a6e66', valley: '#5e9c3e', workshop: '#c9863e', ruins: '#7b8a5e', plateau: '#e7a3c3' };
-const FLOOR = { capital: 3.2, forest: 3.0, valley: 2.4, workshop: 2.8, ruins: 3.6, plateau: 11 };
-const FLAT = { capital: [27, 16], forest: [22, 10], valley: [17, 10], workshop: [22, 15], ruins: [22, 15], plateau: [30, 21] };
+const DEFAULT_STYLE = { ground: '#7fb35a', foliage: '#4d8b44', floor: 3, flat: [22, 14], clear: 22, signY: 15 };
 
 /* ---------- 資料前處理 ---------- */
 const regions = W.regions;
@@ -36,10 +40,11 @@ regions.forEach((r) => {
     r.x = Math.sin(a) * REGION_DIST; r.z = -Math.cos(a) * REGION_DIST;
     r.toward = new THREE.Vector2(-Math.sin(a), Math.cos(a)); // 指向王都
   }
-  r.floor = FLOOR[r.id] ?? 3;
-  r.flat = FLAT[r.id] ?? [22, 14];
+  r.style = { ...DEFAULT_STYLE, rune: r.id.toUpperCase(), ...STYLE[r.id] };
+  r.floor = r.style.floor;
+  r.flat = r.style.flat;
   r.col = new THREE.Color(r.color);
-  r.ground = new THREE.Color(GROUND[r.id] ?? '#7fb35a');
+  r.ground = new THREE.Color(r.style.ground);
   r.teachers = [];
   RG[r.id] = r;
 });
@@ -187,7 +192,7 @@ function sparkles(parent, count, color, radius, y0, y1, size = 0.45, speed = 1) 
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size, map: dotTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   parent.add(pts);
-  animators.push((t, dt) => {
+  const animate = (t, dt) => {
     const p = geo.attributes.position;
     for (let i = 0; i < count; i++) {
       let y = p.getY(i) + dt * seed[i] * speed;
@@ -195,7 +200,9 @@ function sparkles(parent, count, color, radius, y0, y1, size = 0.45, speed = 1) 
       p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t * seed[i] + i) * dt * 0.3);
     }
     p.needsUpdate = true;
-  });
+  };
+  pts.userData.animate = animate;
+  animators.push(animate);
   return pts;
 }
 
@@ -611,7 +618,6 @@ regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
 
 /* ---------- 植被與岩石 ---------- */
 {
-  const EXCL = { capital: 27, forest: 21, valley: 14, workshop: 24, ruins: 24, plateau: 27 };
   const count = isTouch ? 340 : 480;
   const pts = [];
   let tries = 0;
@@ -621,7 +627,7 @@ regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
     const x = Math.cos(a) * d, z = Math.sin(a) * d;
     const inf = terrainInfo(x, z);
     if (inf.h < 1.5 || inf.pathW > 0.02) continue;
-    if (inf.nearD < (EXCL[inf.near.id] ?? 22)) continue;
+    if (inf.nearD < inf.near.style.clear) continue;
     let bad = false;
     for (const r of regions) if (Math.hypot(x - r.approach.x, z - r.approach.z) < 7) { bad = true; break; }
     if (bad || !isClear(x, z, 1.2)) continue;
@@ -638,7 +644,7 @@ regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color();
   const tint = (pt) => {
     const base = new THREE.Color('#4d8b44');
-    const regCol = new THREE.Color(FOLIAGE[pt.near.id] || '#4d8b44');
+    const regCol = new THREE.Color(pt.near.style.foliage);
     base.lerp(regCol, sstep(50, 22, pt.nearD));
     return base.multiplyScalar(0.85 + Math.random() * 0.3);
   };
@@ -789,31 +795,32 @@ regions.forEach((r) => {
   const el = document.createElement('button');
   el.type = 'button'; el.className = 'region-sign';
   el.style.setProperty('--region', r.color);
-  el.innerHTML = `<i>${esc(RUNE[r.id] || r.id.toUpperCase())}</i><b>${esc(r.name)}</b><span class="fog-tag">迷霧籠罩 · 點擊驅散</span>`;
+  el.innerHTML = `<i>${esc(r.style.rune)}</i><b>${esc(r.name)}</b><span class="fog-tag">迷霧籠罩 · 點擊驅散</span>`;
   el.setAttribute('aria-label', `前往${r.name}`);
   el.addEventListener('click', (e) => { e.stopPropagation(); goRegion(r); });
   const o = new CSS2DObject(el);
-  const y = heightAt(r.x, r.z) + (r.id === 'capital' ? 32 : r.id === 'forest' ? 21 : 15);
+  const y = heightAt(r.x, r.z) + r.style.signY;
   o.position.set(r.x, y, r.z);
   scene.add(o);
   regionSigns.push({ r, el, pos: o.position });
 });
 
 /* =========================================================================
- * 灰霧：未探索的區域被迷霧籠罩，抵達後散去（王都一開始就是已探索）
+ * 白霧：未探索的區域被迷霧籠罩，抵達後散去（王都一開始就是已探索）
  * ========================================================================= */
 const EXPLORE_KEY = 'tutIdQuest.explored.v1';
 const explored = new Set(['capital']);
 try { JSON.parse(localStorage.getItem(EXPLORE_KEY) || '[]').forEach((id) => explored.add(id)); } catch (e) { /* 無法讀取就從頭探索 */ }
 const FOG_R = 28;
+const FOG_OPACITY = 0.6;
 const isFogged = (r) => !!r && !explored.has(r.id);
 
 function buildFog(r) {
   const baseY = heightAt(r.x, r.z);
   const g = new THREE.Group(); g.position.set(r.x, baseY, r.z); scene.add(g);
   const m = new THREE.MeshStandardMaterial({
-    color: '#565a64', emissive: '#2b2e35', emissiveIntensity: 0.25, flatShading: true,
-    roughness: 1, transparent: true, opacity: 0.55, depthWrite: false
+    color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.55, flatShading: true,
+    roughness: 1, transparent: true, opacity: FOG_OPACITY, depthWrite: false
   });
   const puffs = [];
   const N = isTouch ? 36 : 48;
@@ -829,8 +836,20 @@ function buildFog(r) {
     p.renderOrder = 2;
     g.add(p); puffs.push(p);
   }
-  const motes = sparkles(g, 50, '#d9dce4', FOG_R * 0.85, 1, 16, 0.6, 0.5);
+  const motes = sparkles(g, 50, '#ffffff', FOG_R * 0.85, 1, 16, 0.6, 0.5);
   r.fog = { g, m, puffs, motes, revealAt: null };
+}
+/* 迷霧消散後移出場景並釋放 GPU 資源 */
+function disposeFog(r) {
+  const f = r.fog;
+  if (!f) return;
+  scene.remove(f.g);
+  f.puffs.forEach((p) => p.geometry.dispose());
+  f.m.dispose();
+  f.motes.geometry.dispose(); f.motes.material.dispose();
+  // 此時可能正在走訪 animators，等這一輪跑完再移除
+  queueMicrotask(() => { const i = animators.indexOf(f.motes.userData.animate); if (i >= 0) animators.splice(i, 1); });
+  r.fog = null;
 }
 regions.forEach((r) => { if (isFogged(r)) buildFog(r); });
 
@@ -844,14 +863,14 @@ animators.push((t, dt) => {
     } else {
       const k = Math.min(1, (performance.now() - f.revealAt) / 1900);
       const e = 1 - (1 - k) * (1 - k);
-      f.m.opacity = 0.55 * (1 - e);
+      f.m.opacity = FOG_OPACITY * (1 - e);
       f.motes.material.opacity = 1 - e;
       f.puffs.forEach((p) => {
         const b = p.userData.base;
         p.position.set(b.x * (1 + e * 0.9), b.y + e * 12, b.z * (1 + e * 0.9));
         p.scale.set(1 + e, (1 + e) * 0.85, 1 + e);
       });
-      if (k >= 1) scene.remove(f.g);
+      if (k >= 1) disposeFog(r);
     }
   }
 });
@@ -869,7 +888,7 @@ function reveal(r) {
   if (!isFogged(r)) return false;
   explored.add(r.id);
   try { localStorage.setItem(EXPLORE_KEY, JSON.stringify([...explored])); } catch (e) { /* 忽略 */ }
-  if (r.fog) { if (reduceMotion) scene.remove(r.fog.g); else r.fog.revealAt = performance.now(); }
+  if (r.fog) { if (reduceMotion) disposeFog(r); else r.fog.revealAt = performance.now(); }
   applyFogState();
   refreshProgress();
   return true;
@@ -917,7 +936,7 @@ controls.update();
 
 const state = {
   mode: 'tour', started: false, flying: null, currentRegion: null, nearNPC: null,
-  card: null, filter: '', regionFilter: null, completeShown: false,
+  card: null, cardTimer: null, filter: '', regionFilter: null, completeShown: false,
   yaw: 0, pitch: 0.42, dist: isTouch ? 17 : 14, walkT: 0
 };
 const keys = new Set();
@@ -955,21 +974,21 @@ function goRegion(r) {
 function selectTeacher(f, { fromCodex = false } = {}) {
   const n = f.npc, r = RG[f.region] || RG.capital;
   if (fromCodex) closeCodexIfNarrow();
+  clearTimeout(state.cardTimer);
   const fogged = isFogged(r);
-  const wait = reduceMotion ? 0 : 1600;
   if (state.mode === 'explore') {
     const s = f.slot;
     if (fromCodex || fogged || player.position.distanceTo(n.pos) > 14) teleport(s.x + s.fx * 4.5, s.z + s.fz * 4.5, Math.atan2(s.fx, s.fz));
-    if (fogged) { showToast(r, reveal(r)); setTimeout(() => openCard(f), wait); }
-    else openCard(f);
-  } else if (fogged) {
-    // 先飛到區域看迷霧散去，再靠近導師
-    flyTo(viewForRegion(r), () => {
-      showToast(r, reveal(r));
-      setTimeout(() => flyTo(viewForNPC(n), () => openCard(f), 1.3), wait);
-    });
+    if (!fogged) { openCard(f); return; }
+    showToast(r, reveal(r));
+    // 讓迷霧先散一半再開卡；這段時間若玩家已走開或切換模式就取消
+    state.cardTimer = setTimeout(() => {
+      if (state.mode === 'explore' && !state.card && player.position.distanceTo(n.pos) < 8) openCard(f);
+    }, reduceMotion ? 0 : 900);
   } else {
-    flyTo(viewForNPC(n), () => openCard(f), 1.5);
+    // 迷霧中的導師：出發時就驅散迷霧，鏡頭直接穿過消散中的霧飛到導師面前
+    if (fogged) showToast(r, reveal(r));
+    flyTo(viewForNPC(n), () => openCard(f), fogged ? 2 : 1.5);
   }
 }
 
@@ -995,6 +1014,7 @@ function setMode(mode) {
   if (mode === state.mode) return;
   state.mode = mode;
   state.flying = null;
+  clearTimeout(state.cardTimer);
   document.body.classList.toggle('exploring', mode === 'explore');
   $('#mode-label').innerHTML = (mode === 'explore' ? '導覽' : '探險') + '<span class="lbl-long">模式</span>';
   if (mode === 'explore') {
@@ -1073,8 +1093,9 @@ function interact() { if (state.mode === 'explore' && state.nearNPC && !state.ca
 
 /* ---------- 輸入 ---------- */
 window.addEventListener('keydown', (e) => {
-  if (e.target.closest && e.target.closest('input, textarea')) return;
   if (e.code === 'Escape') { if (state.card) closeCard(); else if ($('#codex').classList.contains('open')) toggleCodex(false); return; }
+  if (e.code === 'Tab' && state.card) { trapFocus(e, $('#card-sheet')); return; }
+  if (e.target.closest && e.target.closest('input, textarea')) return;
   if (state.mode !== 'explore' || !state.started) return;
   if (['KeyE', 'Enter', 'Space'].includes(e.code)) { interact(); e.preventDefault(); return; }
   if (/^(Key[WASD]|Arrow|Shift)/.test(e.code)) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); }
@@ -1162,7 +1183,7 @@ function markVisited(f) {
 }
 
 const photoHTML = (f) => f.photo
-  ? `<img src="${esc(f.photo)}" alt="${esc(f.name)}老師照片" referrerpolicy="no-referrer" loading="lazy" data-initial="${esc(f.name[0])}">`
+  ? `<img src="${esc(f.photo)}" alt="${esc(f.name)}老師照片" loading="lazy" data-initial="${esc(f.name[0])}">`
   : `<span>${esc(f.name[0])}</span>`;
 function fixBrokenPhotos(root) {
   root.querySelectorAll('img[data-initial]').forEach((img) => {
@@ -1171,8 +1192,20 @@ function fixBrokenPhotos(root) {
   });
 }
 
+/* 讓 Tab／Shift+Tab 只在 root 內的可聚焦元素間循環 */
+function trapFocus(e, root) {
+  const items = [...root.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')].filter((el) => !el.disabled && el.offsetParent);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (!root.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
 function openCard(f) {
   const r = RG[f.region] || RG.capital;
+  // 記下開卡前的焦點，關卡時還回去（上一位／下一位切換時不覆蓋）
+  if (!state.card) state.returnFocus = document.activeElement;
   state.card = f;
   markVisited(f);
   $('#prompt').hidden = true;
@@ -1227,6 +1260,8 @@ function openCard(f) {
 }
 function closeCard() {
   $('#card').hidden = true; state.card = null; state.nearNPC = null;
+  const back = state.returnFocus; state.returnFocus = null;
+  if (back && back !== document.body && back.isConnected && !back.closest('[inert]')) back.focus({ preventScroll: true });
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 忽略 */ }
   if (state.pendingComplete && !state.completeShown) { state.completeShown = true; state.pendingComplete = false; $('#complete').hidden = false; }
 }
@@ -1238,6 +1273,7 @@ function toggleCodex(open) {
   const c = $('#codex');
   const on = open ?? !c.classList.contains('open');
   c.classList.toggle('open', on); c.setAttribute('aria-hidden', String(!on));
+  c.inert = !on; // 收起時抽屜內的按鈕不應被 Tab 選到
   if (on && !isTouch) setTimeout(() => $('#codex-search').focus({ preventScroll: true }), 300);
 }
 function closeCodexIfNarrow() { if (window.innerWidth < 900) toggleCodex(false); }
@@ -1314,7 +1350,7 @@ $('#codex-list').addEventListener('click', (e) => {
 function updateHint() {
   const h = $('#hint');
   if (state.mode === 'tour') {
-    h.innerHTML = isTouch ? '單指旋轉 · 雙指縮放 · 點旗幟驅散灰霧' : '拖曳旋轉 · 滾輪縮放 · 右鍵平移 · 點擊旗幟驅散灰霧、點名牌拜訪導師';
+    h.innerHTML = isTouch ? '單指旋轉 · 雙指縮放 · 點旗幟驅散白霧' : '拖曳旋轉 · 滾輪縮放 · 右鍵平移 · 點擊旗幟驅散白霧、點名牌拜訪導師';
   } else {
     h.innerHTML = isTouch ? '左下搖桿移動 · 拖曳畫面轉視角' : '<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動 · <kbd>Shift</kbd> 奔跑 · 拖曳轉視角 · <kbd>E</kbd> 對話';
   }
@@ -1324,7 +1360,7 @@ function updateHint() {
 let toastTimer = null;
 function showToast(r, revealed = false) {
   state.currentRegion = r;
-  $('#toast-rune').textContent = RUNE[r.id] || '';
+  $('#toast-rune').textContent = r.style.rune;
   $('#toast-name').textContent = r.name;
   $('#toast-motto').textContent = revealed ? `迷霧散去 · ${r.motto}` : r.motto;
   const t = $('#toast'); t.classList.add('show');
@@ -1362,7 +1398,7 @@ function drawMinimap() {
     if (!isFogged(r)) return;
     const [x, y] = toMap(r.x, r.z), rad = (FOG_R * 1.15) / (WORLD_HALF * 2) * MM;
     const gr = mctx.createRadialGradient(x, y, rad * 0.35, x, y, rad);
-    gr.addColorStop(0, 'rgba(62,65,74,0.92)'); gr.addColorStop(1, 'rgba(62,65,74,0)');
+    gr.addColorStop(0, 'rgba(255,255,255,0.88)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     mctx.fillStyle = gr; mctx.beginPath(); mctx.arc(x, y, rad, 0, Math.PI * 2); mctx.fill();
   });
   regions.forEach((r) => {
@@ -1408,7 +1444,7 @@ $('#cta-master').href = W.links.master;
 function showFogTip() {
   const left = regions.filter(isFogged).length;
   if (!left) return;
-  $('#tip-text').innerHTML = `還有 <b>${left}</b> 個區域被灰霧遮蔽，霧中的導師要驅散迷霧後才會現身。<br>點區域旗幟、在探險模式走近，或把鏡頭拉近，就能驅散迷霧。`;
+  $('#tip-text').innerHTML = `還有 <b>${left}</b> 個區域被白霧遮蔽，霧中的導師要驅散迷霧後才會現身。<br>點區域旗幟、在探險模式走近，或把鏡頭拉近，就能驅散迷霧。`;
   const tip = $('#tip'); tip.hidden = false;
   clearTimeout(showFogTip.timer); showFogTip.timer = setTimeout(() => { tip.hidden = true; }, 12000);
 }

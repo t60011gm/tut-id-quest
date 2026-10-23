@@ -1,5 +1,5 @@
 /* =========================================================================
- * 南應大室研大冒險 · 師資資料檔
+ * 南應大室研所大冒險 · 師資資料檔
  * -------------------------------------------------------------------------
  * 這是網站唯一需要定期維護的檔案。新增、修改老師或區域時只要改這裡。
  * 資料來源：台南應用科技大學室內設計系「專任師資」頁面
@@ -20,11 +20,11 @@
  *     fields   研究領域 → 顯示為「專長技能」
  *     courses  授課科目 → 顯示為「傳授技能書」
  *     feats    證照 / 獲獎 / 代表經歷 → 顯示為「冒險紀錄」
- *     photo    照片網址（讀取失敗時會自動改用姓名頭像）
+ *     photo    照片路徑，放在 img/faculty/<id>.jpg（讀取失敗時會自動改用姓名頭像）
  * ========================================================================= */
 
 window.WORLD = {
-  title: "南應大室研大冒險",
+  title: "南應大室研所大冒險",
   subtitle: "台南應用科技大學 室內設計系碩士班 · 師資探險地圖",
   links: {
     admissions: "https://admissions.tut.edu.tw/",
@@ -97,7 +97,7 @@ window.WORLD = {
       feats: ["室內設計系第九任系主任（113.02～迄今）", "本系專任副教授（103.08～迄今）"],
       email: "t60013@mail.tut.edu.tw",
       url: "https://reurl.cc/bENWo3",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/403/m/mczh-tw400x400_small37592_509910450337.jpg"
+      photo: "img/faculty/huang-jiao-yi.jpg"
     },
     {
       id: "chang-yi-fen",
@@ -111,7 +111,7 @@ window.WORLD = {
       feats: ["曾任樹德科技大學專任副教授", "曾任葉世宗建築師事務所專案設計師"],
       email: "t00359@mail.tut.edu.tw",
       url: "https://id.tut.edu.tw/p/406-1067-60471,r1265.php?Lang=zh-tw",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/818/m/mczh-tw400x400_small60471_609259077454.jpg"
+      photo: "img/faculty/chang-yi-fen.jpg"
     },
     {
       id: "feng-yi-ming",
@@ -125,7 +125,7 @@ window.WORLD = {
       feats: ["曾任多家設計工程公司設計部經理、主任", "曾任嶺東科技大學專案助理教授"],
       email: "t60134@mail.tut.edu.tw",
       url: "https://id.tut.edu.tw/p/406-1067-60472,r1265.php?Lang=zh-tw",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/666/m/mczh-tw400x400_small60472_883406309849.jpg"
+      photo: "img/faculty/feng-yi-ming.jpg"
     },
     {
       id: "hsu-hung-hsin",
@@ -139,7 +139,7 @@ window.WORLD = {
       feats: ["本系專任講師（80.08～迄今）", "曾任多家建築師事務所設計師"],
       email: "t60005@mail.tut.edu.tw",
       url: "https://reurl.cc/kE8vrx",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/331/m/mczh-tw400x400_small37584_829654697871.jpg"
+      photo: "img/faculty/hsu-hung-hsin.jpg"
     },
     {
       id: "lin-chieh-jen",
@@ -153,7 +153,7 @@ window.WORLD = {
       feats: ["學術暨產學合作中心主任（112.08～115.07）", "本系專任副教授（100.08～迄今）"],
       email: "t60011@mail.tut.edu.tw",
       url: "https://reurl.cc/qNKG4n",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/786/m/mczh-tw400x400_small37591_202678250380.png"
+      photo: "img/faculty/lin-chieh-jen.jpg"
     },
     {
       id: "chen-nien-tsu",
@@ -167,7 +167,7 @@ window.WORLD = {
       feats: ["計畫管理組組長（112.08～115.07）", "曾任成大祐生環控研究中心研究人員"],
       email: "t60099@mail.tut.edu.tw",
       url: "https://reurl.cc/eWWp9L",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/867/m/mczh-tw400x400_small37589_541228049999.jpeg"
+      photo: "img/faculty/chen-nien-tsu.jpg"
     },
     {
       id: "huang-kun-chih",
@@ -181,7 +181,7 @@ window.WORLD = {
       feats: ["空間設計學會研討會 優秀論文", "建築學會研究成果發表會 優秀論文獎", "ISO/IEC 17025 實驗室認證訓練合格", "丙級建築製圖技術士"],
       email: "t60111@mail.tut.edu.tw",
       url: "https://eportfolio.tut.edu.tw/blogself?id=91845DC665DF4D21962CFA3A7770FEC6",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/544/m/mczh-tw400x400_small41812_586925899424.jpg"
+      photo: "img/faculty/huang-kun-chih.jpg"
     },
     {
       id: "chiang-po-hung",
@@ -195,7 +195,7 @@ window.WORLD = {
       feats: ["裝潢木工乙級技術士", "曾任謝英俊、劉居立建築師事務所設計師"],
       email: "t60106@mail.tut.edu.tw",
       url: "https://reurl.cc/p5L3k4",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/718/m/mczh-tw400x400_small37590_924808050594.jpg"
+      photo: "img/faculty/chiang-po-hung.jpg"
     },
     {
       id: "chen-wan-yi",
@@ -209,7 +209,7 @@ window.WORLD = {
       feats: ["曾任喬治黑羊設計設計師", "曾任建典精密設計顧問"],
       email: "t60062@mail.tut.edu.tw",
       url: "https://reurl.cc/LXX42X",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/174/m/mczh-tw400x400_small37586_15899950703.jpeg"
+      photo: "img/faculty/chen-wan-yi.jpg"
     },
     {
       id: "chang-tsai-chuan",
@@ -223,7 +223,7 @@ window.WORLD = {
       feats: ["本系專任助理教授（98.02～迄今）"],
       email: "t60010@mail.tut.edu.tw",
       url: "https://reurl.cc/jRR3Dq",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/622/m/mczh-tw400x400_small37580_740596050491.jpg"
+      photo: "img/faculty/chang-tsai-chuan.jpg"
     },
     {
       id: "huang-shu-li",
@@ -237,7 +237,7 @@ window.WORLD = {
       feats: ["建築物室內裝修工程管理乙級技術士", "曾任蔡佳峯建築師事務所空間規劃設計師"],
       email: "t60077@mail.tut.edu.tw",
       url: "https://www.facebook.com/profile.php?id=1455051288",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/56/m/mczh-tw400x400_small38155_900532850661.jpg"
+      photo: "img/faculty/huang-shu-li.jpg"
     },
     {
       id: "liu-chia-chen",
@@ -251,7 +251,7 @@ window.WORLD = {
       feats: ["曾任建築師事務所設計總監、設計經理", "曾任空間設計公司負責人"],
       email: "t60130@mail.tut.edu.tw",
       url: "https://id.tut.edu.tw/p/406-1067-57537,r1265.php?Lang=zh-tw",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/163/m/mczh-tw400x400_small57537_888007463547.jpg"
+      photo: "img/faculty/liu-chia-chen.jpg"
     },
     {
       id: "chen-hung-chi",
@@ -265,7 +265,7 @@ window.WORLD = {
       feats: ["曾任高雄市立美術館典藏組助理研究員"],
       email: "t60026@mail.tut.edu.tw",
       url: "https://reurl.cc/aaa8QX",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/184/m/mczh-tw400x400_small37594_91034050529.jpeg"
+      photo: "img/faculty/chen-hung-chi.jpg"
     },
     {
       id: "lien-tang-hsuan",
@@ -279,7 +279,7 @@ window.WORLD = {
       feats: ["公共關係組組長（112.08～115.07）"],
       email: "te0063@mail.tut.edu.tw",
       url: "https://reurl.cc/ZNle5V",
-      photo: "https://id.tut.edu.tw/var/file/67/1067/pictures/107/m/mczh-tw400x400_small54009_195673152254.jpg"
+      photo: "img/faculty/lien-tang-hsuan.jpg"
     }
   ]
 };
