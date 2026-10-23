@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>設域大陸</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="台南應用科技大學室內設計系碩士班招生互動網站：在 3D 奇幻大陸上探險，拜訪 14 位導師，認識他們的研究專長。">
+<meta property="og:title" content="設域大陸｜南應大室內設計系碩士班師資探險地圖">
+<meta property="og:description" content="在 3D 奇幻大陸上拜訪 14 位導師，找到最適合你的指導教授。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="stage" aria-label="3D 大陸地圖"></div>
+<div id="labels"></div>
+
+<!-- 頂部 HUD -->
+<header id="hud">
+  <div class="brand plate">
+    <div class="crest"><span>設</span></div>
+    <div>
+      <strong>設域大陸</strong>
+      <small>南應大 室內設計系碩士班</small>
+    </div>
+  </div>
+  <div class="progress plate" aria-live="polite">
+    <span id="prog-text">已拜訪 <b>0</b> / 14 位導師</span>
+    <div class="bar"><i id="prog-bar"></i></div>
+  </div>
+  <nav class="actions">
+    <span class="btn mobile-progress" id="prog-mini">0 / 14</span>
+    <button class="btn" id="btn-mode" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><path d="M12 8v6l-3 6M12 14l3 6M8 11h8"/></svg>
+      <span id="mode-label">探險<span class="lbl-long">模式</span></span>
+    </button>
+    <button class="btn" id="btn-codex" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M9 7h7M9 11h5"/></svg>
+      <span><span class="lbl-long">導師</span>圖鑑</span>
+    </button>
+    <a class="btn primary" id="btn-apply" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      <span>報考<span class="lbl-long">碩士班</span></span>
+    </a>
+  </nav>
+</header>
+
+<figure id="minimap-wrap" class="plate" style="margin:0">
+  <canvas id="minimap" width="336" height="336" aria-label="小地圖，點擊區域可前往"></canvas>
+  <figcaption>點擊小地圖快速前往</figcaption>
+</figure>
+
+<div id="hint" class="plate"></div>
+<div id="prompt" class="plate" hidden></div>
+<div id="toast" aria-live="polite"><small id="toast-rune"></small><strong id="toast-name"></strong><span id="toast-motto"></span></div>
+
+<div id="joystick" hidden><div class="knob"></div></div>
+<button id="btn-interact" type="button" hidden disabled>對話</button>
+
+<!-- 導師圖鑑 -->
+<aside id="codex" aria-label="導師圖鑑" aria-hidden="true">
+  <div class="drawer-head">
+    <h2>導師圖鑑</h2>
+    <button class="icon-btn" id="codex-close" type="button" aria-label="關閉圖鑑">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <label class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <input id="codex-search" type="search" placeholder="搜尋專長或課程，例如：AI、木作、色彩" autocomplete="off">
+  </label>
+  <div class="chips" id="codex-chips"></div>
+  <div class="codex-list" id="codex-list"></div>
+</aside>
+
+<!-- 導師卡 -->
+<div id="card" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="card-name">
+  <article class="sheet" id="card-sheet"></article>
+</div>
+
+<!-- 開場 -->
+<div id="intro" class="overlay">
+  <div class="title-card">
+    <div class="eyebrow">TUT · INTERIOR DESIGN · M.A.</div>
+    <h1>設域大陸</h1>
+    <p class="sub">台南應用科技大學 室內設計系碩士班 · 師資探險地圖</p>
+    <p class="lore">在這片大陸上，<b>六個區域</b>各自守護著一門設計技藝。<br>
+      <b>十四位導師</b>散居其間，等待新的冒險者來訪。<br>
+      走遍大陸、收集他們的專長，找到你的指導教授。</p>
+    <div class="ctrl">
+      <div class="plate"><b>導覽模式</b><span>拖曳旋轉視角、滾輪縮放；點擊區域旗幟或導師名牌，鏡頭會飛過去。</span></div>
+      <div class="plate"><b>探險模式</b><span>用 WASD 或方向鍵（手機用搖桿）走動，靠近導師按 E 或「對話」。</span></div>
+    </div>
+    <button class="btn primary go" id="btn-start" type="button">開始冒險</button>
+    <div class="fine">師資資料取自本系網站「專任師資」頁面</div>
+  </div>
+</div>
+
+<!-- 全部拜訪完成 -->
+<div id="complete" class="overlay" hidden>
+  <div class="title-card">
+    <div class="eyebrow">QUEST COMPLETE</div>
+    <h1>大陸已走遍</h1>
+    <p class="lore">你已拜訪全部 <b>十四位導師</b>。<br>下一段旅程，從報考碩士班開始。</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <a class="btn primary go" id="cta-admissions" target="_blank" rel="noopener">招生資訊</a>
+      <a class="btn go" id="cta-master" target="_blank" rel="noopener">碩士班介紹</a>
+    </div>
+    <button class="btn" id="btn-complete-close" type="button">繼續探索</button>
+  </div>
+</div>
+
+<div id="loading">正在繪製大陸⋯</div>
+<div id="webgl-error" hidden>
+  <p>你的瀏覽器無法顯示 3D 地圖。請改用新版 Chrome、Edge 或 Safari 開啟，<br>或直接前往 <a href="https://id.tut.edu.tw/p/403-1067-1265.php?Lang=zh-tw">本系師資頁面</a>。</p>
+</div>
+
+<script src="data/faculty.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
