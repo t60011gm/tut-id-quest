@@ -11,6 +11,8 @@
 - `js/main.js`：ES module。主要段落依序為：地形高度函式 `terrainInfo()` → 地形網格 → NPC 站位 → 各區域地標 `build<Region>()` → 植被 → NPC → 玩家 → 控制（導覽 OrbitControls／探險第三人稱）→ 介面（導師卡、圖鑑、小地圖）→ 主迴圈。
 - 每個區域地標在 `regionCtx(r)` 的區域座標系中建構：local +z 永遠指向王都（訪客來的方向），NPC 站在 local v≈12 處面向訪客。
 - `colliders` 陣列是探險模式的碰撞圓；`animators` 陣列是每幀更新函式。
+- NPC：`buildNPC(f)` 依 `f.look` 組出 Q 版人物（`buildHair`／`buildHatLook`／`buildGlasses`／`buildTop`／`buildArm`），招牌道具在 `PROPS`（每個回傳每幀更新函式）。`updateNPCs()` 處理轉身、揮手、底部對話框 `#dialog`（輪播 `f.lines`）與拜訪特效；`updateMood()` 依鏡頭焦點把霧色與天光換成 `MOOD` 中的區域色調。
+- 人物外觀參考老師照片；沒有照片的老師（目前徐灝、吳宛蓉）用中性外觀，等老師提供再改。
 - 白霧：`explored` Set（localStorage `tutIdQuest.explored.v1`）記錄已探索區域，王都預設已探索。`buildFog(r)` 建霧、`reveal(r)` 驅散並播放消散動畫、`applyFogState()` 同步名牌與旗幟。迷霧中的導師在圖鑑顯示為「？？？」，小地圖也會遮住。
 - `css/style.css`：單一深色主題，所有顏色來自 `:root` token。導師卡是羊皮紙風格（淺底深字），其他 HUD 是深藍底黃銅邊。
 
