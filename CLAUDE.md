@@ -8,6 +8,7 @@
 ## 架構
 - `index.html`：介面骨架；Three.js 0.170 以 importmap 從 jsDelivr 載入。
 - `data/faculty.js`：`window.WORLD`，含 `regions`（6 個區域）與 `faculty`（12 位研究所導師：專任 8 位、兼任 4 位，兼任標 `adjunct: true`）。**內容修改只改這裡。**
+- `data/quests.js`：`window.QUESTS`，12 位導師的兩階段任務（採集任務、「○○老師的試煉」小遊戲）的文字、題目、答案與知識小卡。題目改這裡，再執行 `node tools/quest-sheet.js` 重新產生審閱用的 `docs/quest-answers.md`（不要直接改 md）。小遊戲的專業內容要請老師審閱。
 - `js/main.js`：ES module。主要段落依序為：地形高度函式 `terrainInfo()` → 地形網格 → NPC 站位 → 各區域地標 `build<Region>()` → 植被 → NPC → 玩家 → 控制（導覽 OrbitControls／探險第三人稱）→ 介面（導師卡、圖鑑、小地圖）→ 主迴圈。
 - 地圖尺寸：島嶼半徑 `ISLAND_R` 150、區域中心距王都 `REGION_DIST` 80。改尺寸時一併檢查地形 `SIZE`、植被與岩石範圍、雲、`controls.maxDistance`、探險邊界、小地圖 `WORLD_HALF`。陰影由 `updateShadow()` 跟著鏡頭焦點走。
 - 任務採集場：每區一塊（`faculty.js` 各區的 `field`），半徑 `FIELD_R`，放在兩區之間沒有道路的荒野；`terrainInfo()` 回傳 `fieldW`，植被與岩石會避開，小地圖畫虛線圈。
