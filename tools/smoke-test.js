@@ -83,6 +83,17 @@ async function run(browser, name, opts) {
   await page.keyboard.press('Escape');
   check('搜尋框內 Esc 關閉圖鑑', await page.evaluate(() => !document.querySelector('#codex').classList.contains('open')));
 
+  // 音效開關：可開可關、不出錯
+  await page.click('#btn-sound');
+  await page.waitForTimeout(600);
+  const soundOn = await page.evaluate(() => document.querySelector('#btn-sound').getAttribute('aria-pressed') === 'true');
+  await page.click('#btn-sound');
+  check('音效開關', soundOn && await page.evaluate(() => document.querySelector('#btn-sound').getAttribute('aria-pressed') === 'false'));
+
+  // 效能：靜態模型已合併，draw call 維持在合理範圍
+  const perf = await page.evaluate(() => ({ merged: window.__quest.mergeInfo, calls: window.__quest.renderer.info.render.calls }));
+  check('靜態模型合併', perf.merged.after > 0 && perf.merged.after < perf.merged.before, `${perf.merged.before} → ${perf.merged.after} 個，draw call ${perf.calls}`);
+
   // 探險模式
   await page.evaluate(() => window.__quest.setMode('explore'));
   await page.waitForTimeout(1500);

@@ -14,7 +14,9 @@
 - NPC：`buildNPC(f)` 依 `f.look` 組出 Q 版人物（`buildHair`／`buildHatLook`／`buildGlasses`／`buildTop`／`buildArm`），招牌道具在 `PROPS`（每個回傳每幀更新函式）。`updateNPCs()` 處理轉身、揮手、底部對話框 `#dialog`（輪播 `f.lines`）與拜訪特效；`updateMood()` 依鏡頭焦點把霧色與天光換成 `MOOD` 中的區域色調。
 - 人物外觀參考老師照片；沒有照片的老師（目前徐灝、吳宛蓉）用中性外觀，等老師提供再改。
 - 地標特效共用工具（在 `buildCapital` 前）：`canvasTex()` 用 canvas 畫貼圖、`drapedPlane()` 貼地形的平面配 `groundFX()` 著色器做地面特效、`playerLocal()` 取玩家在區域座標的位置。重的特效動畫開頭用 `camNear(r)` 判斷，鏡頭遠離該區就暫停。
-- 效能：目前整島視角約 1,400 次 draw call。新增模型時優先用 `InstancedMesh` 或共用材質，手機（`isTouch`）要減少粒子與數量。
+- 材質：`mat(color, opts)` 產生快取的卡通材質（`TOON`，四階 `toonRamp`，會忽略 metalness／roughness）；`texMat('stone'|'tile'|'wood', color, repeat)` 是加上程式貼圖（`PATTERNS`）的版本。
+- 效能：主迴圈前的 `mergeStatic()` 會把所有 animators 在幾個時間點跑一次，找出會動的物件，其餘靜態模型依「區域（或 NPC）＋材質」合併；整島視角約 700 次 draw call。**會動但不在 animators 裡、或動得很少的物件要用 `dyn(obj)` 標記**（例如 NPC 手臂、品牌牆標誌），否則會被合併而動不了。霧團是 `InstancedMesh`。新增模型時手機（`isTouch`）要減少粒子與數量。
+- 音效：`sound`（Web Audio 即時合成，無音檔）。各區環境音隨 `updateMood()` 淡入淡出，`sound.sfx('card'|'reveal'|'visit')` 播互動音效。預設關閉，開關在小地圖角落（localStorage `tutIdQuest.sound.v1`）。
 - 白霧：`explored` Set（localStorage `tutIdQuest.explored.v1`）記錄已探索區域，王都預設已探索。`buildFog(r)` 建霧、`reveal(r)` 驅散並播放消散動畫、`applyFogState()` 同步名牌與旗幟。迷霧中的導師在圖鑑顯示為「？？？」，小地圖也會遮住。
 - `css/style.css`：單一深色主題，所有顏色來自 `:root` token。導師卡是羊皮紙風格（淺底深字），其他 HUD 是深藍底黃銅邊。
 

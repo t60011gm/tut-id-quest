@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const W = window.WORLD;
 const $ = (s) => document.querySelector(s);
@@ -169,10 +170,63 @@ let skyMat, hemi, sunLight;
 }
 
 /* ---------- 共用工具 ---------- */
+/* 卡通明暗：四階漸層，讓地標與人物的明暗分成清楚的色塊，畫風統一 */
+const TOON = true;
+const toonRamp = (() => {
+  const t = new THREE.DataTexture(new Uint8Array([88, 140, 192, 238]), 4, 1, THREE.RedFormat);
+  t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return t;
+})();
 const MATS = new Map();
 function mat(color, o = {}) {
   const key = color + JSON.stringify(o);
-  if (!MATS.has(key)) MATS.set(key, new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, ...o }));
+  if (!MATS.has(key)) {
+    if (TOON) {
+      const { metalness, roughness, flatShading, ...rest } = o; // 卡通材質沒有金屬度與粗糙度
+      MATS.set(key, new THREE.MeshToonMaterial({ color, gradientMap: toonRamp, ...rest }));
+    } else MATS.set(key, new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: 0.8, ...o }));
+  }
+  return MATS.get(key);
+}
+/* 程式貼圖：淺灰紋理，由材質顏色染色，同一張紋理可用在不同顏色 */
+const PATTERNS = {
+  stone(c, w, h) { // 石砌：錯縫石塊
+    c.fillStyle = '#9a9a9a'; c.fillRect(0, 0, w, h);
+    for (let y = 0, row = 0; y < h; y += 32, row++) for (let x = -48; x < w; x += 48) {
+      const v = 210 + ((x * 7 + y * 13) % 40); c.fillStyle = `rgb(${v},${v},${v})`;
+      c.fillRect(x + (row % 2) * 24 + 2, y + 2, 44, 28);
+    }
+  },
+  tile(c, w, h) { // 屋瓦：魚鱗瓦
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h);
+    for (let y = 0, row = 0; y < h + 16; y += 16, row++) for (let x = -16; x < w + 16; x += 32) {
+      const cx = x + (row % 2) * 16;
+      c.fillStyle = '#c8c8c8'; c.beginPath(); c.arc(cx, y, 16, 0, Math.PI); c.fill();
+      c.fillStyle = '#f2f2f2'; c.beginPath(); c.arc(cx, y - 2, 13, 0, Math.PI); c.fill();
+    }
+  },
+  wood(c, w, h) { // 木紋：直紋與節眼
+    c.fillStyle = '#e6e6e6'; c.fillRect(0, 0, w, h);
+    for (let k = 0; k < 26; k++) {
+      const x0 = (k * 37) % w, v = 160 + (k * 29) % 70;
+      c.strokeStyle = `rgba(${v},${v},${v},0.8)`; c.lineWidth = 1 + (k % 3);
+      c.beginPath(); for (let y = 0; y <= h; y += 8) c.lineTo(x0 + Math.sin(y * 0.05 + k) * 3, y); c.stroke();
+    }
+    c.fillStyle = 'rgba(120,120,120,0.6)'; c.beginPath(); c.ellipse(90, 40, 5, 9, 0, 0, Math.PI * 2); c.fill();
+  }
+};
+const PATTERN_TEX = {};
+function texMat(pattern, color, repeat = 1) {
+  const key = `tex:${pattern}:${color}:${repeat}`;
+  if (!MATS.has(key)) {
+    let t = PATTERN_TEX[pattern + repeat];
+    if (!t) {
+      const c = document.createElement('canvas'); c.width = c.height = 128; PATTERNS[pattern](c.getContext('2d'), 128, 128);
+      t = PATTERN_TEX[pattern + repeat] = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = 4;
+    }
+    MATS.set(key, TOON ? new THREE.MeshToonMaterial({ color, map: t, gradientMap: toonRamp }) : new THREE.MeshStandardMaterial({ color, map: t, roughness: 0.85 }));
+  }
   return MATS.get(key);
 }
 function mesh(geo, m, x = 0, y = 0, z = 0, parent = null) {
@@ -297,7 +351,10 @@ regions.forEach((r) => {
  * ========================================================================= */
 /* ---------- 地標特效共用工具 ---------- */
 // 鏡頭離區域太遠時暫停該區的特效動畫，省效能
-const camNear = (r, d = 170) => Math.hypot(camera.position.x - r.x, camera.position.z - r.z) < d;
+let detecting = false; // 合併靜態模型前偵測動態物件時，強制所有特效都跑
+const camNear = (r, d = 170) => detecting || Math.hypot(camera.position.x - r.x, camera.position.z - r.z) < d;
+// 標記會動、但動得不頻繁的物件，避免被當成靜態模型合併
+const dyn = (o) => { o.userData.dynamic = true; return o; };
 // 用 canvas 畫貼圖
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -331,7 +388,7 @@ function playerLocal(g, out) {
 
 function buildCapital(r) {
   const ctx = regionCtx(r), { g, col } = ctx;
-  const stone = mat('#e8dcc2'), stone2 = mat('#c9ba9b'), roof = mat('#b5452f'), gold = mat('#e2b45c', { metalness: 0.45, roughness: 0.4 });
+  const stone = texMat('stone', '#f0e6cf', 2), stone2 = texMat('stone', '#d3c4a4', 2), roof = texMat('tile', '#c24a33', 2), gold = mat('#e2b45c', { metalness: 0.45, roughness: 0.4 });
   const win = mat('#3a2614', { emissive: '#ffb347', emissiveIntensity: 0.7 });
   // 城牆旗幟：藍圖布
   const bpTex = canvasTex(64, 160, (c, w, h) => {
@@ -651,7 +708,7 @@ function buildValley(r) {
   mesh(new THREE.BoxGeometry(5, 0.25, 3.8), mat('#6e5a43'), 0, 3.12, 0, cabin);
   const panes = [-1.4, 0, 1.4].map((x) => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.1, 0.08), new THREE.MeshStandardMaterial({ color: '#cfe9ff', emissive: '#ffd27a', emissiveIntensity: 0.1, transparent: true, opacity: 0.85 })); m.position.set(x, 1.45, 1.72); cabin.add(m); return m; });
   for (const x of [-0.9, 0.9]) { const sp = mesh(new THREE.BoxGeometry(1.6, 0.08, 1.4), mat('#24365e', { metalness: 0.6, roughness: 0.3 }), x, 3.55, -0.4, cabin); sp.rotation.x = -0.35; }
-  const beacon = mesh(new THREE.SphereGeometry(0.16, 8, 6), mat('#7dffb0', { emissive: '#3cff8a', emissiveIntensity: 1.5 }), 1.9, 3.5, 1.4, cabin);
+  const beacon = dyn(mesh(new THREE.SphereGeometry(0.16, 8, 6), mat('#7dffb0', { emissive: '#3cff8a', emissiveIntensity: 1.5 }), 1.9, 3.5, 1.4, cabin));
   beacon.castShadow = false;
   col(-9.5, 5, 2.8);
   // CFD 流線：看得見的氣流，顏色由冷（藍）到熱（紅）
@@ -707,7 +764,7 @@ function buildValley(r) {
 
 function buildWorkshop(r) {
   const { g, ly, col } = regionCtx(r);
-  const plaster = mat('#efe0c2'), timber = mat('#7a4d2c'), roofM = mat('#9c4a2e'), roof2 = mat('#6e5a43'), oak = mat('#b07444'), win = mat('#3a2614', { emissive: '#ffb347', emissiveIntensity: 0.6 });
+  const plaster = mat('#efe0c2'), timber = texMat('wood', '#8a5a36'), roofM = texMat('tile', '#a8503a', 0.6), roof2 = texMat('tile', '#7a6550', 0.6), oak = texMat('wood', '#c08452'), win = mat('#3a2614', { emissive: '#ffb347', emissiveIntensity: 0.6 });
   function house(u, v, w, d, h, rot, roofMat) {
     const hs = new THREE.Group(); hs.position.set(u, ly(u, v), v); hs.rotation.y = rot; g.add(hs);
     mesh(new THREE.BoxGeometry(w, h, d), plaster, 0, h / 2, 0, hs);
@@ -807,7 +864,7 @@ function buildWorkshop(r) {
   for (let k = 0; k < 3; k++) { const b = mesh(new THREE.BoxGeometry(0.3, 0.3, 3.2), oak, P0.x + (k - 1) * 0.36, P0.y + 0.15, P0.z, g); b.rotation.y = BEAM_ROT; }
   col(P0.x, P0.z, 1.4);
   const P1 = new THREE.Vector3(-8.5, ly(-8.5, 5) + 4.85, 5);
-  const placed = mesh(new THREE.BoxGeometry(0.3, 0.3, 3.2), mat('#d39a5e', { emissive: '#ffb347', emissiveIntensity: 0 }), P1.x, P1.y, P1.z, g); placed.rotation.y = BEAM_ROT;
+  const placed = dyn(mesh(new THREE.BoxGeometry(0.3, 0.3, 3.2), mat('#d39a5e', { emissive: '#ffb347', emissiveIntensity: 0 }), P1.x, P1.y, P1.z, g)); placed.rotation.y = BEAM_ROT;
   const angTo = (p) => Math.atan2(-(p.z - cb.z), p.x - cb.x), distTo = (p) => Math.hypot(p.x - cb.x, p.z - cb.z) - 0.4;
   const A0 = angTo(P0), A1 = angTo(P1), D0 = distTo(P0), D1 = distTo(P1), TOP = cb.y + 8.6;
   const sm = (a, b, k) => a + (b - a) * (k * k * (3 - 2 * k));
@@ -888,7 +945,7 @@ function buildWorkshop(r) {
 /* 創生市集：社區總體營造、創新產業、商業空間與設計經營 */
 function buildMarket(r) {
   const ctx = regionCtx(r), { g, ly, col } = ctx;
-  const wood = mat('#8a5a33'), plank = mat('#c9a06a'), plaster = mat('#f1e6d2'), bark = mat('#6b4a2f'), red = mat('#b8392e');
+  const wood = texMat('wood', '#9a6a40'), plank = texMat('wood', '#d6ad78'), plaster = mat('#f1e6d2'), bark = texMat('wood', '#7a5638'), red = mat('#b8392e');
   const AWN = ['#e5484d', '#f5c518', '#3a8ee6', '#46b35b', '#f28c28', '#8b5cd6'];
   // 中央廣場與大榕樹：社區聚會的地方
   mesh(new THREE.CylinderGeometry(7.5, 7.8, 0.3, 24), mat('#dccaa4'), 0, 0.05, 0, g);
@@ -1022,7 +1079,7 @@ function buildMarket(r) {
       wk.w.rotation.y = Math.atan2(-Math.sin(a) * Math.sign(wk.sp), Math.cos(a) * Math.sign(wk.sp));
       wk.legs.forEach((l, i) => { l.rotation.x = Math.sin(t * 7 + wk.ph) * 0.5 * (i ? 1 : -1); });
     });
-    if (t > nextPop) {
+    if (t > nextPop || nextPop - t > 5) {
       nextPop = t + 0.9 + Math.random() * 0.8;
       const p = pops.find((q) => t - q.t0 > 1.6), st = stalls[Math.floor(Math.random() * stalls.length)];
       if (p) { p.t0 = t; p.at = st; }
@@ -1110,7 +1167,7 @@ function buildPlateau(r) {
     c.font = 'bold 34px sans-serif'; c.textAlign = 'center'; c.fillText('TUT · ID', 128, 228);
   });
   const variants = [logo('#ffffff', r.color, false), logo('#1d1d22', '#ffffff', false), logo('#eef6ea', '#3f9b4f', true)];
-  const tiles = [-3, 0, 3].map((x, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), new THREE.MeshStandardMaterial({ map: variants[i], roughness: 0.6, side: THREE.DoubleSide })); m.position.set(x, 3, 0.32); wall.add(m); return m; });
+  const tiles = [-3, 0, 3].map((x, i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), new THREE.MeshStandardMaterial({ map: variants[i], roughness: 0.6, side: THREE.DoubleSide })); m.position.set(x, 3, 0.32); wall.add(dyn(m)); return m; });
   const swatch = (hex) => canvasTex(96, 140, (c, w, h) => {
     c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); c.fillStyle = hex; c.fillRect(0, 0, w, 100);
     c.fillStyle = '#333'; c.font = 'bold 15px sans-serif'; c.fillText(hex.toUpperCase(), 8, 124);
@@ -1154,7 +1211,7 @@ function buildPlateau(r) {
     rippleMat.uniforms.time.value = t;
     if (playerLocal(g, plV)) rippleMat.uniforms.pl.value.copy(plV); else rippleMat.uniforms.pl.value.set(999, 999);
     // 品牌牆：每 3 秒翻轉一次，換成另一個版本的標誌
-    if (t > flipAt) { flipAt = t + 3; vi++; }
+    if (t > flipAt || flipAt - t > 3) { flipAt = t + 3; vi++; }
     const fk = Math.min(1, (t - (flipAt - 3)) / 0.6);
     tiles.forEach((m, i) => {
       m.rotation.y = fk < 1 ? Math.sin(fk * Math.PI) * Math.PI * 0.5 : 0;
@@ -1352,7 +1409,7 @@ function buildTop(lk, g, r) {
 
 /* 手臂：以肩膀為軸，方便揮手與拿道具 */
 function buildArm(lk, g, sx) {
-  const piv = new THREE.Group(); piv.position.set(sx * 0.6, 2.0, 0); g.add(piv);
+  const piv = dyn(new THREE.Group()); piv.position.set(sx * 0.6, 2.0, 0); g.add(piv); // 揮手與拿道具，不能合併
   const sleeve = mat(lk.topColor || '#555555'), skin = mat(SKIN);
   if (lk.top === 'sleeveless') mesh(new THREE.CapsuleGeometry(0.13, 0.72, 4, 8), skin, 0, -0.45, 0, piv);
   else if (lk.sleeves === 'short') {
@@ -1671,6 +1728,7 @@ function buildFog(r) {
     color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.8, flatShading: true,
     roughness: 1, transparent: true, opacity: FOG_OPACITY, depthWrite: false, toneMapped: false
   });
+  // 霧團用 InstancedMesh：整區只要一次 draw call
   const puffs = [];
   const N = isTouch ? 36 : 48;
   for (let i = 0; i < N; i++) {
@@ -1679,21 +1737,33 @@ function buildFog(r) {
     const x = Math.cos(a) * k * FOG_R, z = Math.sin(a) * k * FOG_R;
     const sz = 4 + hash2(i, 2.2) * 4.5 + (1 - k) * 2.5;
     const y = heightAt(r.x + x, r.z + z) - baseY + sz * 0.35 + hash2(i, 8.8) * 6 + (1 - k) * 7;
-    const p = new THREE.Mesh(new THREE.IcosahedronGeometry(sz, 0), m);
-    p.position.set(x, y, z); p.scale.y = 0.85;
-    p.userData = { base: p.position.clone(), ph: hash2(i, 3) * 6.28 };
-    p.renderOrder = 2;
-    g.add(p); puffs.push(p);
+    puffs.push({ base: new THREE.Vector3(x, y, z), sz, ph: hash2(i, 3) * 6.28, rot: hash2(i, 6) * 6.28 });
   }
+  const inst = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), m, N);
+  inst.renderOrder = 2; inst.frustumCulled = false; g.add(inst);
   const motes = sparkles(g, 50, '#ffffff', FOG_R * 0.85, 1, 16, 0.6, 0.5);
-  r.fog = { g, m, puffs, motes, revealAt: null };
+  r.fog = { g, m, puffs, inst, motes, revealAt: null };
+  placePuffs(r.fog, 0, 0);
+}
+const _fm = new THREE.Matrix4(), _fq = new THREE.Quaternion(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fy = new THREE.Vector3(0, 1, 0);
+/* t：時間（霧團上下飄動）；e：消散進度 0～1 */
+function placePuffs(f, t, e) {
+  f.puffs.forEach((p, i) => {
+    const b = p.base;
+    if (e > 0) _fp.set(b.x * (1 + e * 0.9), b.y + e * 12, b.z * (1 + e * 0.9));
+    else _fp.set(b.x, b.y + Math.sin(t * 0.6 + p.ph) * 0.6, b.z);
+    _fq.setFromAxisAngle(_fy, p.rot + t * 0.1);
+    _fs.set(p.sz * (1 + e), p.sz * (1 + e) * 0.85, p.sz * (1 + e));
+    f.inst.setMatrixAt(i, _fm.compose(_fp, _fq, _fs));
+  });
+  f.inst.instanceMatrix.needsUpdate = true;
 }
 /* 迷霧消散後移出場景並釋放 GPU 資源 */
 function disposeFog(r) {
   const f = r.fog;
   if (!f) return;
   scene.remove(f.g);
-  f.puffs.forEach((p) => p.geometry.dispose());
+  f.inst.geometry.dispose(); f.inst.dispose();
   f.m.dispose();
   f.motes.geometry.dispose(); f.motes.material.dispose();
   // 此時可能正在走訪 animators，等這一輪跑完再移除
@@ -1708,17 +1778,13 @@ animators.push((t, dt) => {
     if (!f || !f.g.parent) continue;
     if (f.revealAt === null) {
       f.g.rotation.y += dt * 0.035;
-      f.puffs.forEach((p) => { p.position.y = p.userData.base.y + Math.sin(t * 0.6 + p.userData.ph) * 0.6; p.rotation.y += dt * 0.1; });
+      if (camNear(r, 220)) placePuffs(f, t, 0);
     } else {
       const k = Math.min(1, (performance.now() - f.revealAt) / 1900);
       const e = 1 - (1 - k) * (1 - k);
       f.m.opacity = FOG_OPACITY * (1 - e);
       f.motes.material.opacity = 1 - e;
-      f.puffs.forEach((p) => {
-        const b = p.userData.base;
-        p.position.set(b.x * (1 + e * 0.9), b.y + e * 12, b.z * (1 + e * 0.9));
-        p.scale.set(1 + e, (1 + e) * 0.85, 1 + e);
-      });
+      placePuffs(f, t, e);
       if (k >= 1) disposeFog(r);
     }
   }
@@ -1738,6 +1804,7 @@ function reveal(r) {
   explored.add(r.id);
   try { localStorage.setItem(EXPLORE_KEY, JSON.stringify([...explored])); } catch (e) { /* 忽略 */ }
   if (r.fog) { if (reduceMotion) disposeFog(r); else r.fog.revealAt = performance.now(); }
+  sound.sfx('reveal');
   applyFogState();
   refreshProgress();
   return true;
@@ -2029,6 +2096,7 @@ function markVisited(f) {
   if (f.npc) f.npc.waveAt = performance.now() / 1000;
   if (visited.has(f.id)) return;
   if (f.npc) f.npc.burstAt = performance.now() / 1000;
+  sound.sfx('visit');
   visited.add(f.id); saveVisited();
   if (refreshProgress() && !state.completeShown) state.pendingComplete = true;
 }
@@ -2059,6 +2127,7 @@ function openCard(f) {
   if (!state.card) state.returnFocus = document.activeElement;
   state.card = f;
   markVisited(f);
+  sound.sfx('card');
   $('#prompt').hidden = true;
   const sheet = $('#card-sheet');
   sheet.style.setProperty('--region', r.color);
@@ -2304,6 +2373,7 @@ $('#tip-close').addEventListener('click', () => { $('#tip').hidden = true; });
 $('#btn-start').addEventListener('click', () => {
   $('#intro').hidden = true;
   state.started = true;
+  sound.resumeIfWanted();
   setTimeout(showFogTip, reduceMotion ? 0 : 2600);
   const hashId = decodeURIComponent(location.hash.slice(1));
   const target = faculty.find((f) => f.id === hashId);
@@ -2329,6 +2399,99 @@ $('#btn-mode').addEventListener('click', () => { if (!state.started) return; set
 refreshProgress();
 updateHint();
 
+/* =========================================================================
+ * 環境音效：Web Audio 即時合成，不需要音檔。預設關閉，訪客按小地圖上的喇叭鈕開啟。
+ * 每區一條環境音軌（bed），依鏡頭所在區域淡入淡出；互動時另外播放短音效。
+ * ========================================================================= */
+const SOUND_KEY = 'tutIdQuest.sound.v1';
+const sound = (() => {
+  let ac = null, master = null, on = false;
+  const beds = {}, nextAt = {};
+  const LEVEL = { capital: 0.55, forest: 0.5, valley: 0.75, workshop: 0.9, market: 0.8, plateau: 0.9 };
+  const PENTA = [523.3, 587.3, 659.3, 784, 880, 1046.5, 1174.7, 1318.5];
+  let arp = 0;
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  function tone(freq, t0, dur, vol, type = 'sine', dest = master) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(dest); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  function burst(t0, dur, freq, vol, dest = master, sweepTo = null) {
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = beds.noise; f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(freq, t0);
+    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + dur * 0.25); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(f).connect(g).connect(dest); s.start(t0, Math.random()); s.stop(t0 + dur + 0.05);
+  }
+  function init() {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+    const nb = beds.noise = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const d = nb.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const loopNoise = () => { const s = ac.createBufferSource(); s.buffer = nb; s.loop = true; s.start(); return s; };
+    const bed = (id) => { const g = ac.createGain(); g.gain.value = 0; g.connect(master); beds[id] = g; return g; };
+    const filt = (type, freq, q = 1) => { const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; return f; };
+    const lfo = (freq, depth, target) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = freq; g.gain.value = depth; o.connect(g).connect(target); o.start(); };
+    // 全島：微風
+    const base = bed('base'); base.gain.value = 0.22; loopNoise().connect(filt('lowpass', 420)).connect(base);
+    // 環控風谷：較強的風，音色隨氣流起伏
+    const vf = filt('bandpass', 700, 0.8); lfo(0.11, 420, vf.frequency); loopNoise().connect(vf).connect(bed('valley'));
+    // 運算之森：低音和聲墊
+    const ff = filt('lowpass', 900); ff.connect(bed('forest'));
+    [220, 329.6, 440.5].forEach((fr) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'triangle'; o.frequency.value = fr; g.gain.value = 0.1; o.connect(g).connect(ff); o.start(); });
+    // 設計王都：溫暖和弦
+    const cb = bed('capital');
+    [130.8, 196, 261.6].forEach((fr) => { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.value = fr; g.gain.value = 0.08; o.connect(g).connect(cb); o.start(); });
+    // 創生市集：人聲般的低語
+    const mg = ac.createGain(); mg.gain.value = 0.5; lfo(3.1, 0.25, mg.gain);
+    loopNoise().connect(filt('bandpass', 460, 1.2)).connect(mg).connect(bed('market'));
+    bed('workshop'); bed('plateau');
+  }
+  // 每幀呼叫：依所在區域調整音量，並排程該區的點綴音
+  function update(id, w) {
+    if (!on || !ac) return;
+    const t = ac.currentTime;
+    for (const r of Object.keys(LEVEL)) beds[r].gain.setTargetAtTime(r === id ? w * LEVEL[r] : 0, t, 0.6);
+    if (!id || w < 0.1) return;
+    if ((nextAt[id] || 0) > t + 10) nextAt[id] = t; // 剛開啟時重置
+    if (t < (nextAt[id] || 0)) return;
+    const b = beds[id];
+    if (id === 'forest') { tone(pick(PENTA) * 2, t, 0.3, 0.06, 'sine', b); nextAt[id] = t + 0.35 + Math.random() * 0.9; }
+    else if (id === 'workshop') { tone(85, t, 0.18, 0.5, 'sine', b); burst(t, 0.08, 2200, 0.35, b); nextAt[id] = t + (Math.random() < 0.3 ? 0.35 : 1.1); }
+    else if (id === 'market') { if (Math.random() < 0.5) { tone(1046.5, t, 1.4, 0.08, 'sine', b); tone(1568, t + 0.02, 1.1, 0.04, 'sine', b); } nextAt[id] = t + 2.5 + Math.random() * 3; }
+    else if (id === 'plateau') { const f = PENTA[[0, 2, 4, 5, 4, 2, 3, 1][arp++ % 8]]; tone(f, t, 1.0, 0.09, 'sine', b); tone(f * 2, t, 0.4, 0.025, 'sine', b); nextAt[id] = t + 0.32; }
+    else if (id === 'capital') { tone(pick([523.3, 659.3, 784]), t, 2.4, 0.06, 'sine', b); nextAt[id] = t + 3.5 + Math.random() * 3; }
+    else nextAt[id] = t + 1;
+  }
+  function sfx(name) {
+    if (!on || !ac) return;
+    const t = ac.currentTime;
+    if (name === 'card') { tone(784, t, 0.5, 0.12); tone(1174.7, t + 0.08, 0.6, 0.1); }
+    else if (name === 'reveal') burst(t, 1.3, 300, 0.5, master, 2600);
+    else if (name === 'visit') [523.3, 659.3, 784, 1046.5].forEach((f, i) => tone(f, t + i * 0.07, 0.6, 0.1, 'triangle'));
+  }
+  const btn = $('#btn-sound');
+  function set(v) {
+    on = v;
+    try { localStorage.setItem(SOUND_KEY, v ? '1' : '0'); } catch (e) { /* 忽略 */ }
+    btn.setAttribute('aria-pressed', String(v));
+    btn.setAttribute('aria-label', v ? '關閉音效' : '開啟音效');
+    btn.classList.toggle('on', v);
+    if (v) {
+      if (!ac) init();
+      ac.resume(); master.gain.setTargetAtTime(0.5, ac.currentTime, 0.3);
+    } else if (ac) master.gain.setTargetAtTime(0, ac.currentTime, 0.15);
+  }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); set(!on); });
+  document.addEventListener('visibilitychange', () => { if (ac && on) (document.hidden ? ac.suspend() : ac.resume()); });
+  let pref = false;
+  try { pref = localStorage.getItem(SOUND_KEY) === '1'; } catch (e) { /* 忽略 */ }
+  btn.classList.toggle('on', pref);
+  // 瀏覽器規定要有使用者操作才能發聲：記得上次開著的話，按「開始冒險」時再開啟
+  return { update, sfx, set, resumeIfWanted: () => { if (pref) set(true); } };
+})();
+
 /* 區域氛圍：鏡頭焦點靠近哪一區，霧色與天光就漸漸染上該區的色調 */
 const MOOD_COL = Object.fromEntries(Object.entries(MOOD).map(([id, m]) => [id, { fog: new THREE.Color(m.fog), hemi: new THREE.Color(m.hemi), sun: new THREE.Color(m.sun) }]));
 const moodBase = MOOD_COL.capital, moodCol = { fog: new THREE.Color(), hemi: new THREE.Color(), sun: new THREE.Color() };
@@ -2347,11 +2510,79 @@ function updateMood(dt) {
   skyMat.uniforms.mid.value.lerp(moodCol.fog, k);
   hemi.color.lerp(moodCol.hemi, k);
   sunLight.color.lerp(moodCol.sun, k);
+  sound.update(best && best.id, w);
 }
 
 /* =========================================================================
  * 主迴圈
  * ========================================================================= */
+/* =========================================================================
+ * 效能：合併靜態模型
+ * 地標由上千個小模型組成，每個都是一次 draw call。先把所有動畫在幾個時間點各跑一次，
+ * 找出位置、顯示或材質會變的物件；其餘靜態模型依「區域＋材質＋陰影設定」合併成一個。
+ * 材質本身的動畫（例如發光強度）不受影響，因為合併後仍共用同一個材質。
+ * ========================================================================= */
+function mergeStatic() {
+  const npcGroups = new Set(npcs.map((n) => n.group));
+  const skip = new Set([player]);
+  const cands = [];
+  const visibleUp = (o) => { for (let x = o; x; x = x.parent) if (!x.visible) return false; return true; };
+  scene.updateMatrixWorld(true);
+  scene.traverse((o) => {
+    if (skip.has(o)) return;
+    let root = scene;
+    for (let x = o.parent; x; x = x.parent) { if (skip.has(x) || x.userData.dynamic) return; if (npcGroups.has(x)) root = x; }
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || o.userData.dynamic || o.children.length) return;
+    if (!o.geometry.attributes.position || !o.geometry.attributes.normal) return;
+    cands.push({ o, root, m: o.matrixWorld.clone(), v: visibleUp(o), mat: o.material });
+  });
+  const keep = scene.fog.color.clone();
+  detecting = true;
+  const T = [0.7, 1.9, 2.9, 4.4, 5.3, 6.6, 8.1, 9.2, 10.6, 11.5, 13.3, 17.9];
+  for (const t of T) {
+    animators.forEach((fn) => fn(t, 0.016));
+    scene.updateMatrixWorld(true);
+    for (const c of cands) if (!c.dyn && (!c.o.matrixWorld.equals(c.m) || visibleUp(c.o) !== c.v || c.o.material !== c.mat)) c.dyn = true;
+  }
+  detecting = false;
+  animators.forEach((fn) => fn(0, 0)); // 回到起始狀態
+  scene.fog.color.copy(keep);
+  scene.updateMatrixWorld(true);
+  const groups = new Map();
+  for (const c of cands) {
+    if (c.dyn || !c.v) continue;
+    const o = c.o, wp = new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+    let near = RG.capital, nd = 1e9;
+    for (const r of regions) { const d = Math.hypot(wp.x - r.x, wp.z - r.z); if (d < nd) { nd = d; near = r; } }
+    const key = [c.root.uuid, near.id, o.material.uuid, o.castShadow, o.receiveShadow, o.renderOrder].join('|');
+    if (!groups.has(key)) groups.set(key, { root: c.root, list: [] });
+    groups.get(key).list.push(o);
+  }
+  let before = 0, after = 0;
+  const inv = new THREE.Matrix4(), rel = new THREE.Matrix4();
+  for (const { root, list } of groups.values()) {
+    if (list.length < 2) continue;
+    inv.copy(root.matrixWorld).invert();
+    const geos = list.map((o) => {
+      let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
+      if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+      geo.morphAttributes = {};
+      return geo.applyMatrix4(rel.multiplyMatrices(inv, o.matrixWorld));
+    });
+    const merged = mergeGeometries(geos, false);
+    geos.forEach((g2) => g2.dispose());
+    if (!merged) continue;
+    const src = list[0], m = new THREE.Mesh(merged, src.material);
+    m.castShadow = src.castShadow; m.receiveShadow = src.receiveShadow; m.renderOrder = src.renderOrder;
+    m.matrixAutoUpdate = false; root.add(m);
+    list.forEach((o) => o.removeFromParent());
+    before += list.length; after++;
+  }
+  return { before, after };
+}
+const mergeInfo = mergeStatic();
+
 const clock = new THREE.Clock();
 let firstFrame = true;
 function tick() {
@@ -2423,4 +2654,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer };
+window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo };
