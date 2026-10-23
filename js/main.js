@@ -819,8 +819,9 @@ function buildFog(r) {
   const baseY = heightAt(r.x, r.z);
   const g = new THREE.Group(); g.position.set(r.x, baseY, r.z); scene.add(g);
   const m = new THREE.MeshStandardMaterial({
-    color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.55, flatShading: true,
-    roughness: 1, transparent: true, opacity: FOG_OPACITY, depthWrite: false
+    // 不套用色調映射並提高自發光，背光面也維持接近純白
+    color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.8, flatShading: true,
+    roughness: 1, transparent: true, opacity: FOG_OPACITY, depthWrite: false, toneMapped: false
   });
   const puffs = [];
   const N = isTouch ? 36 : 48;
@@ -1548,4 +1549,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored };
+window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls };

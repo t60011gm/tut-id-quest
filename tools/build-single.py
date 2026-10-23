@@ -28,9 +28,10 @@ def inline_img(m):
     return '"data:%s;base64,%s"' % (mime, base64.b64encode(path.read_bytes()).decode())
 data = re.sub(r'"(img/[^"]+\.(?:jpg|jpeg|png))"', inline_img, data)
 
-html = html.replace('<link rel="stylesheet" href="css/style.css">', f"<style>\n{css}\n</style>")
-html = html.replace('<script src="data/faculty.js"></script>', f"<script>\n{data}\n</script>")
-html = html.replace('<script type="module" src="js/main.js"></script>', f'<script type="module">\n{main}\n</script>')
+# 允許網址帶 ?v= 版本號
+html = re.sub(r'<link rel="stylesheet" href="css/style\.css(?:\?v=\w+)?">', lambda m: f"<style>\n{css}\n</style>", html)
+html = re.sub(r'<script src="data/faculty\.js(?:\?v=\w+)?"></script>', lambda m: f"<script>\n{data}\n</script>", html)
+html = re.sub(r'<script type="module" src="js/main\.js(?:\?v=\w+)?"></script>', lambda m: f'<script type="module">\n{main}\n</script>', html)
 
 if fragment:
     head = re.search(r"<head>(.*?)</head>", html, re.S).group(1)
