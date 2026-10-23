@@ -110,6 +110,7 @@ const games = {
     w();
   },
   storeplan(s) {
+    if (s.items) { w(`**預算 ${s.budget}**；可選設施：${s.items.map((i) => `${i.name}（${i.cost}）`).join('、')}`); w(); }
     w('| 位置 | 最佳設施 | 理由 |');
     w('|---|---|---|');
     s.slots.forEach((x) => w(`| ${x.slot} | ${x.best} | ${x.why} |`));

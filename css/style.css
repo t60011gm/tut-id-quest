@@ -755,3 +755,78 @@ button { cursor: pointer; }
   .tg-graph.narrow { height: 430px; }
   .tg-graph.narrow .tg-gnode { width: 44%; min-width: 0; }
 }
+
+/* ---------- 第二批試煉 ---------- */
+/* 3D 列印疊層 */
+.tg-stack { width: 100%; max-width: 380px; justify-self: center; border-radius: 6px; cursor: pointer; touch-action: manipulation; }
+
+/* 木構架 */
+.tg-frame { width: 100%; max-height: 44vh; background: #eaf2f6; border: 1px solid var(--parchment-edge); border-radius: 4px; }
+.tg-ground { fill: #9b8a6a; }
+.tg-bay { fill: rgba(255,255,255,.01); stroke: none; cursor: pointer; outline: none; }
+.tg-bay:hover, .tg-bay:focus { fill: rgba(200, 121, 74, .15); }
+.tg-bay.on { fill: rgba(200, 121, 74, .08); }
+.tg-brace { stroke: #b07444; stroke-width: 7; stroke-linecap: round; pointer-events: none; }
+.tg-post, .tg-beam { stroke: #7a4d2c; stroke-width: 9; stroke-linecap: round; pointer-events: none; }
+.tg-joint { fill: #3a2a1e; pointer-events: none; }
+.tg-wind { fill: #3a8ee6; font-weight: 900; font-size: 16px; text-anchor: end; }
+
+/* 社區提案 */
+.tg-wishes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tg-wish { display: grid; gap: 5px; padding: 10px; border-radius: 6px; border: 1px solid rgba(44,34,22,.2); background: #fbf5e6; }
+.tg-wish > b { font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.tg-wish > b small { font-weight: 400; font-size: 11.5px; color: var(--ink-soft); }
+.tg-wish label { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); }
+.tg-wish select { min-width: 0; padding: 6px; border-radius: 5px; border: 1px solid rgba(44,34,22,.3); background: #fff; color: var(--ink); font-size: 13.5px; }
+.tg-wish-note { margin: 0; font-size: 12px; min-height: 1em; }
+.tg-wish.ok { border-color: #23753f; background: #e3f6e8; }
+.tg-wish.ok .tg-wish-note { color: #23753f; }
+.tg-wish.mid { border-color: #c9a227; background: #fff8dc; }
+.tg-wish.bad { border-color: var(--seal); background: #fde6e5; }
+.tg-wish.bad .tg-wish-note { color: var(--seal); }
+
+/* 店面規劃 */
+.tg-spent.over { color: var(--seal); }
+.tg-palette { display: flex; flex-wrap: wrap; gap: 6px; }
+.tg-palette button { display: grid; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(44,34,22,.25); background: #fbf5e6; color: var(--ink); font-size: 13.5px; font-weight: 600; text-align: left; }
+.tg-palette button small { font-weight: 400; font-size: 11px; color: var(--ink-soft); }
+.tg-palette button.on { border-color: var(--region); box-shadow: 0 0 0 2px var(--region); background: #fff; }
+.tg-shop { position: relative; height: 320px; border: 8px solid #6b5a42; border-bottom-width: 8px; border-radius: 4px; background: #f6efe2;
+  background-image: linear-gradient(rgba(107,90,66,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(107,90,66,.08) 1px, transparent 1px); background-size: 24px 24px; }
+.tg-door { position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); padding: 0 14px; background: #f6efe2; font-size: 12px; font-weight: 700; color: var(--seal); }
+.tg-slot { position: absolute; transform: translate(-50%, -50%); width: 30%; max-width: 150px; display: grid; gap: 1px; padding: 6px; border-radius: 6px; border: 2px dashed rgba(44,34,22,.35); background: rgba(255,255,255,.7); color: var(--ink); text-align: center; }
+.tg-slot small { font-size: 10.5px; color: var(--ink-soft); }
+.tg-slot b { font-size: 13px; }
+.tg-slot.filled { border-style: solid; border-color: var(--region); background: #fff; }
+.tg-slot.ok { border-color: #23753f; background: #e3f6e8; }
+.tg-slot.bad { border-color: var(--seal); background: #fde6e5; }
+.tg-shopper { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--region); box-shadow: 0 0 0 4px rgba(255,255,255,.8); z-index: 2; }
+
+/* 品牌一致性 */
+.tg-spec { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 6px; background: #fbf5e6; border: 1px solid var(--parchment-edge); }
+.tg-spec canvas { width: 60px; height: 60px; border-radius: 4px; }
+.tg-spec ul { margin: 0; padding-left: 1.1em; font-size: 13px; line-height: 1.7; }
+.tg-apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.tg-app { display: grid; gap: 4px; padding: 6px; border-radius: 6px; border: 2px solid rgba(44,34,22,.18); background: #fff; color: var(--ink); font-size: 13px; font-weight: 600; }
+.tg-app canvas { width: 100%; height: auto; border-radius: 3px; }
+.tg-app.ok { border-color: #23753f; box-shadow: 0 0 0 3px rgba(35,117,63,.25); }
+.tg-app.bad { border-color: var(--seal); animation: tg-shake .4s; }
+.tg-app.missed { border: 2px dashed var(--seal); }
+.tg-pack { display: grid; gap: 8px; }
+.tg-pack > b { font-size: 15px; }
+
+/* 情緒板 */
+.tg-board { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--parchment-edge); }
+
+@media (max-width: 720px) {
+  .tg-wishes { grid-template-columns: 1fr; }
+  .tg-shop { height: 300px; }
+  .tg-slot { width: 34%; }
+}
+
+/* 試煉合格證 */
+.cert-btn { justify-self: stretch; }
+.cert-name { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; font-size: 14px; color: var(--ink-soft); }
+.cert-name input { padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(44,34,22,.35); background: #fff; color: var(--ink); font-size: 16px; }
+.cert-canvas { width: 100%; height: auto; border-radius: 4px; box-shadow: 0 6px 16px rgba(60,40,10,.25); }
+a.q-btn { text-decoration: none; display: inline-block; }

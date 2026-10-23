@@ -146,6 +146,7 @@ export function initQuests(api) {
   });
 
   function refreshAll() { persist(); refreshMarks(); refreshTracker(); renderLog(); }
+  const allDone = () => faculty.filter((x) => Q.teachers[x.id]).every((x) => st(x.id).stage === STAGE.DONE);
 
   /* ---------- 前往採集場 ---------- */
   function goField(f) {
@@ -289,11 +290,10 @@ export function initQuests(api) {
         <h3>${first ? '試煉通過！獲得徽章' : '再次通過試煉！'}</h3>
         <p class="trial-intro">「${esc(q.stage2.win)}」</p>
         <div class="knowledge"><h4>知識小卡：${esc(q.stage2.knowledge.title)}</h4><ul>${q.stage2.knowledge.points.map((p) => `<li>${esc(p)}</li>`).join('')}</ul></div>
-        <div class="trial-actions"><button type="button" class="q-btn primary" data-tr="close">收下徽章</button></div>
+        <div class="trial-actions">${allDone() ? '<button type="button" class="q-btn primary" data-tr="cert">領取試煉合格證</button>' : ''}<button type="button" class="q-btn ${allDone() ? '' : 'primary'}" data-tr="close">收下徽章</button></div>
       </div>`;
     trBody.querySelector('[data-tr="close"]').focus({ preventScroll: true });
-    const done = faculty.filter((x) => Q.teachers[x.id] && st(x.id).stage === STAGE.DONE).length;
-    if (done === Object.keys(Q.teachers).length) toast(f, '十二枚徽章全部到手！', '你已通過所有導師的試煉');
+    if (allDone()) toast(f, '十二枚徽章全部到手！', '你已通過所有導師的試煉，可以領取試煉合格證');
   }
   function closeTrial() {
     if (trialCleanup) { trialCleanup(); trialCleanup = null; }
@@ -304,6 +304,8 @@ export function initQuests(api) {
     if (b.dataset.tr === 'start') startGame();
     else if (b.dataset.tr === 'close') closeTrial();
     else if (b.dataset.tr === 'devwin') winTrial();
+    else if (b.dataset.tr === 'cert') showCertificate();
+    else if (b.dataset.tr === 'download') downloadCertificate();
   });
   tr.querySelector('.trial-close').addEventListener('click', closeTrial);
 
@@ -316,6 +318,62 @@ export function initQuests(api) {
     } else if (!tr.hidden && e.code === 'Escape') { closeTrial(); e.stopImmediatePropagation(); }
   }, true);
 
+  /* ---------- 試煉合格證（全破獎勵，招生紀念，非正式文件） ---------- */
+  function drawCertificate(cv, name) {
+    const c = cv.getContext('2d'), W = cv.width, H = cv.height;
+    const g = c.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W * 0.7); g.addColorStop(0, '#fbf3df'); g.addColorStop(1, '#ead9b4');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.strokeStyle = '#a8322b'; c.lineWidth = 6; c.strokeRect(24, 24, W - 48, H - 48);
+    c.strokeStyle = '#c9a227'; c.lineWidth = 2; c.strokeRect(36, 36, W - 72, H - 72);
+    c.textAlign = 'center'; c.fillStyle = '#2c2216';
+    c.font = '600 18px "Cinzel", serif'; c.fillText('TUT · INTERIOR DESIGN · M.A.', W / 2, 92);
+    c.font = '900 46px "Noto Serif TC", serif'; c.fillText('南應大室研所大冒險・試煉合格證', W / 2, 152);
+    c.font = '400 24px "LXGW WenKai TC", serif'; c.fillStyle = '#4a3a26';
+    c.fillText('茲證明', W / 2, 212);
+    c.font = '900 52px "Noto Serif TC", serif'; c.fillStyle = '#a8322b'; c.fillText(name || '冒險者', W / 2, 276);
+    c.font = '400 22px "LXGW WenKai TC", serif'; c.fillStyle = '#4a3a26';
+    c.fillText('已走遍南應室研大陸，通過十二位導師的試煉，獲得以下徽章：', W / 2, 324);
+    const list = faculty.filter((f) => Q.teachers[f.id]);
+    list.forEach((f, i) => {
+      const col = i % 6, row = Math.floor(i / 6), x = W / 2 + (col - 2.5) * 136, y = 400 + row * 120, r = 38;
+      c.fillStyle = regionOf(f).color; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#c9a227'; c.lineWidth = 4; c.stroke();
+      c.fillStyle = '#fff'; c.font = '900 15px "Noto Serif TC", serif';
+      const b = qOf(f).badge; c.fillText(b.slice(0, 2), x, y - 2); c.fillText(b.slice(2), x, y + 17);
+      c.fillStyle = '#4a3a26'; c.font = '400 14px "Noto Sans TC", sans-serif'; c.fillText(`${f.name}老師`, x, y + r + 20);
+    });
+    const d = new Date();
+    c.font = '400 18px "Noto Sans TC", sans-serif'; c.fillStyle = '#4a3a26';
+    c.fillText(`台南應用科技大學 室內設計系碩士班　${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日`, W / 2, H - 92);
+    c.font = '400 13px "Noto Sans TC", sans-serif'; c.fillStyle = '#8a7a5e';
+    c.fillText('本合格證為招生互動遊戲「南應大室研所大冒險」的紀念，非正式學歷或修業證明。', W / 2, H - 60);
+  }
+  function showCertificate() {
+    if (tr.hidden) { tr.hidden = false; state.busy = true; state.paused = true; }
+    tr.style.setProperty('--region', '#a8322b');
+    tr.querySelector('.trial-title').textContent = '試煉合格證';
+    trBody.innerHTML = `
+      <label class="cert-name"><span>合格證上的名字</span><input type="text" maxlength="12" placeholder="冒險者" value="${esc(save.name || '')}"></label>
+      <canvas class="cert-canvas" width="1000" height="760" aria-label="試煉合格證預覽"></canvas>
+      <p class="trial-rules">恭喜走遍大陸！可以下載合格證留念或分享。下一段旅程，就從報考碩士班開始。</p>
+      <div class="trial-actions">
+        <button type="button" class="q-btn primary" data-tr="download">下載合格證</button>
+        <a class="q-btn" href="${esc((window.WORLD.links || {}).admissions || '#')}" target="_blank" rel="noopener">報考碩士班 ↗</a>
+        <button type="button" class="q-btn" data-tr="close">關閉</button>
+      </div>`;
+    const cv = trBody.querySelector('canvas'), input = trBody.querySelector('input');
+    const redraw = () => drawCertificate(cv, input.value.trim());
+    input.addEventListener('input', () => { save.name = input.value.trim(); persist(); redraw(); });
+    // 字型可能還在載入，載完再畫一次
+    redraw(); if (document.fonts) document.fonts.ready.then(redraw);
+  }
+  function downloadCertificate() {
+    const cv = trBody.querySelector('.cert-canvas'); if (!cv) return;
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png'); a.download = `南應大室研所大冒險-試煉合格證${save.name ? '-' + save.name : ''}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
   /* ---------- 任務日誌（圖鑑的「任務」分頁） ---------- */
   function renderLog() {
     const list = faculty.filter((f) => Q.teachers[f.id]);
@@ -323,6 +381,7 @@ export function initQuests(api) {
     const STATUS = ['尚未接受', '採集中', '待試煉', '已通過'];
     logEl.innerHTML = `
       <label class="quick-toggle"><input type="checkbox" id="quick-mode" ${save.quick ? 'checked' : ''}><span><b>快速模式</b>每位導師的採集數量從 ${Q.settings.count} 個減為 ${Q.settings.quickCount} 個，適合招生攤位</span></label>
+      ${done === list.length ? '<button type="button" class="q-btn primary cert-btn" data-cert>領取試煉合格證</button>' : ''}
       <h3 class="log-head">徽章牆 <small>${done} / ${list.length}</small></h3>
       <div class="badge-wall">${list.map((f) => {
         const ok = st(f.id).stage === STAGE.DONE;
@@ -348,6 +407,7 @@ export function initQuests(api) {
   });
   logEl.addEventListener('click', (e) => {
     if (e.target.closest('[data-reset-open]')) { api.openReset(); return; }
+    if (e.target.closest('[data-cert]')) { api.closeCodexIfNarrow(); showCertificate(); return; }
     const b = e.target.closest('.quest-row'); if (!b) return;
     const f = byId[b.dataset.t];
     if (st(f.id).stage === STAGE.COLLECT) goField(f); else api.selectTeacher(f, { fromCodex: true });
@@ -401,13 +461,15 @@ export function initQuests(api) {
 
   // 載入時：還在採集中的任務重新放出小怪
   faculty.forEach((f) => { if (Q.teachers[f.id] && st(f.id).stage === STAGE.COLLECT) spawn(f.id); });
-  refreshAll();
+  refreshMarks(); refreshTracker(); renderLog();  // 載入時不寫入存檔，重置後才會是乾淨的
   const self = { update, pick, interact, cardHTML, bindCard, nearMonster: null, openTrial };
   // 測試用（Playwright）：查看小怪數量、直接收集、開啟淨化視窗
   self.debug = {
     monsters: () => monsters.filter((m) => m.gone < 0).length,
     save: () => JSON.parse(JSON.stringify(save)),
     collectOne: (id) => { const m = monsters.find((x) => x.id === id && x.gone < 0); if (m) collect(m); return !!m; },
+    completeAll: () => { faculty.forEach((f) => { if (Q.teachers[f.id]) st(f.id).stage = STAGE.DONE; }); refreshAll(); },
+    showCertificate: () => showCertificate(),
     firstPos: () => { const m = monsters.find((x) => x.gone < 0); return m && { x: m.group.position.x, z: m.group.position.z }; },
     purify: (id) => { const m = monsters.find((x) => x.id === id && x.gone < 0); if (m) startPurify(m); return !!m; }
   };
