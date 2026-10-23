@@ -25,7 +25,7 @@ const STYLE = {
   forest:   { rune: 'FOREST OF CODE',    ground: '#2f8a72', foliage: '#2a6e66', floor: 3.0, flat: [22, 10], clear: 21, signY: 21 },
   valley:   { rune: 'VALE OF WINDS',     ground: '#86c25a', foliage: '#5e9c3e', floor: 2.4, flat: [17, 10], clear: 14 },
   workshop: { rune: "ARTISANS' HAMLET",  ground: '#b9a066', foliage: '#c9863e', floor: 2.8, flat: [22, 15], clear: 24 },
-  ruins:    { rune: 'ANCIENT RUINS',     ground: '#9b95a9', foliage: '#7b8a5e', floor: 3.6, flat: [22, 15], clear: 24 },
+  market:   { rune: 'COMMONS MARKET',    ground: '#c4b48e', foliage: '#5e9c3e', floor: 3.6, flat: [22, 15], clear: 24 },
   plateau:  { rune: 'CHROMA PLATEAU',    ground: '#d98fb2', foliage: '#e7a3c3', floor: 11,  flat: [30, 21], clear: 27 }
 };
 const DEFAULT_STYLE = { ground: '#7fb35a', foliage: '#4d8b44', floor: 3, flat: [22, 14], clear: 22, signY: 15 };
@@ -425,6 +425,17 @@ function buildValley(r) {
   }
   col(9, 4, 0.6);
   animators.push((t, dt) => { cups.rotation.y += dt * 3; });
+  // 循環之環（循環設計）
+  const loop = new THREE.Group(); loop.position.set(0, ly(0, 3) + 10, 3); g.add(loop);
+  const loopMat = mat('#9be37a', { emissive: '#58c23a', emissiveIntensity: 0.7 });
+  const arcLen = Math.PI * 2 / 3 - 0.45;
+  for (let k = 0; k < 3; k++) {
+    const piv = new THREE.Group(); piv.rotation.z = k * Math.PI * 2 / 3; loop.add(piv);
+    mesh(new THREE.TorusGeometry(2.6, 0.32, 8, 24, arcLen), loopMat, 0, 0, 0, piv);
+    const head = mesh(new THREE.ConeGeometry(0.62, 1.1, 8), loopMat, Math.cos(arcLen) * 2.6, Math.sin(arcLen) * 2.6, 0, piv);
+    head.rotation.z = arcLen; // 箭頭沿圓弧切線
+  }
+  animators.push((t, dt) => { loop.rotation.z += dt * 0.5; loop.rotation.y = Math.sin(t * 0.4) * 0.35; });
   // 可見的氣流
   const N = 320, pos = new Float32Array(N * 3), prm = [];
   for (let i = 0; i < N; i++) prm.push({ rad: 4 + Math.random() * 16, ph: Math.random() * Math.PI * 2, h: 1.5 + Math.random() * 8, sp: 4 + Math.random() * 5 });
@@ -460,13 +471,44 @@ function buildWorkshop(r) {
   const chimney = mesh(new THREE.BoxGeometry(1, 3, 1), mat('#8a7a6a'), 3, 7.2, -1.5, hall);
   house(-13, -2, 5, 4.4, 3.4, 0.5, roof2); house(12.5, -5, 5.5, 4.6, 3.6, -0.45, roofM);
   house(-9, -14, 4.6, 4.2, 3.2, 0.2, roofM); house(8, -15, 5, 4, 3.4, -0.25, roof2);
-  // 巨型椅子雕塑（家具設計）
-  const chair = new THREE.Group(); chair.position.set(-8, ly(-8, 5), 5); chair.rotation.y = 0.5; g.add(chair);
-  mesh(new THREE.BoxGeometry(3.2, 0.45, 3), oak, 0, 2.3, 0, chair);
-  for (const [x, z] of [[-1.35, -1.25], [1.35, -1.25], [-1.35, 1.25], [1.35, 1.25]]) mesh(new THREE.BoxGeometry(0.35, 2.1, 0.35), oak, x, 1.05, z, chair);
-  mesh(new THREE.BoxGeometry(3.2, 0.4, 0.35), oak, 0, 5.4, -1.3, chair);
-  for (const x of [-1.35, -0.45, 0.45, 1.35]) mesh(new THREE.BoxGeometry(0.22, 2.8, 0.22), oak, x, 3.95, -1.3, chair);
-  col(-8, 5, 2.3);
+  // 實構築：外露的木構架（樑柱、斜撐、人字屋架）
+  const frame = new THREE.Group(); frame.position.set(-8.5, ly(-8.5, 5), 5); frame.rotation.y = 0.5; g.add(frame);
+  const FW = 2.6, FD = 1.9, FH = 4.2;
+  for (const x of [-FW, 0, FW]) for (const z of [-FD, FD]) mesh(new THREE.BoxGeometry(0.35, FH, 0.35), oak, x, FH / 2, z, frame);
+  for (const z of [-FD, FD]) mesh(new THREE.BoxGeometry(FW * 2 + 0.6, 0.35, 0.35), timber, 0, FH, z, frame);
+  for (const x of [-FW, 0, FW]) {
+    mesh(new THREE.BoxGeometry(0.3, 0.3, FD * 2 + 0.5), timber, x, FH + 0.3, 0, frame);
+    for (const sg of [-1, 1]) { const rf = mesh(new THREE.BoxGeometry(0.22, 0.22, 2.75), oak, x, FH + 1.15, sg * 0.95, frame); rf.rotation.x = sg * 0.73; }
+  }
+  mesh(new THREE.BoxGeometry(FW * 2 + 0.6, 0.25, 0.25), timber, 0, FH + 2.05, 0, frame);
+  for (const sx of [-1, 1]) for (const z of [-FD, FD]) {
+    const br = mesh(new THREE.BoxGeometry(0.16, 1.56, 0.16), timber, sx * (FW - 0.55), FH - 0.55, z, frame); br.rotation.z = sx * Math.PI / 4;
+  }
+  for (let k = 0; k < 4; k++) mesh(new THREE.BoxGeometry(4, 0.3, 0.3), oak, 0, 0.15 + (k > 1 ? 0.3 : 0), FD + 1.2 + (k % 2) * 0.35, frame);
+  col(-8.5, 5, 3.3);
+  // 數位製造：機械手臂與加工台
+  const steel = mat('#d9dde3', { metalness: 0.5, roughness: 0.35 }), armM = mat('#f28c28', { roughness: 0.5 });
+  const cell = new THREE.Group(); cell.position.set(5.5, ly(5.5, 6.5), 6.5); cell.rotation.y = -0.6; g.add(cell);
+  mesh(new THREE.BoxGeometry(3.2, 0.9, 2), mat('#5a5f69', { metalness: 0.4 }), 1.2, 0.45, 0, cell);
+  mesh(new THREE.BoxGeometry(1.4, 0.5, 1), oak, 1.4, 1.15, 0, cell);
+  mesh(new THREE.CylinderGeometry(0.6, 0.75, 0.6, 12), steel, -1.2, 0.3, 0, cell);
+  const turret = new THREE.Group(); turret.position.set(-1.2, 0.6, 0); cell.add(turret);
+  mesh(new THREE.CylinderGeometry(0.45, 0.5, 0.6, 12), armM, 0, 0.3, 0, turret);
+  const shoulder = new THREE.Group(); shoulder.position.y = 0.7; turret.add(shoulder);
+  mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), armM, 0, 1.1, 0, shoulder);
+  const elbow = new THREE.Group(); elbow.position.y = 2.2; shoulder.add(elbow);
+  mesh(new THREE.SphereGeometry(0.3, 10, 8), steel, 0, 0, 0, elbow);
+  mesh(new THREE.BoxGeometry(0.32, 1.8, 0.32), armM, 0, 0.9, 0, elbow);
+  mesh(new THREE.ConeGeometry(0.16, 0.4, 8), steel, 0, 1.95, 0, elbow);
+  const spark = mesh(new THREE.OctahedronGeometry(0.16), mat('#fff6c8', { emissive: '#ffd36b', emissiveIntensity: 2 }), 0, 2.2, 0, elbow);
+  spark.castShadow = false;
+  col(5.5, 6.5, 2.2);
+  animators.push((t) => {
+    turret.rotation.y = Math.sin(t * 0.6) * 0.35;
+    shoulder.rotation.z = -0.5 + Math.sin(t * 0.9) * 0.12;
+    elbow.rotation.z = -1.6 + Math.sin(t * 1.3) * 0.18;
+    spark.visible = Math.sin(t * 9) > 0;
+  });
   // 木材堆與工作台
   for (let k = 0; k < 6; k++) {
     const lg = mesh(new THREE.CylinderGeometry(0.42, 0.42, 4, 7), mat('#8b5a33'), 9 + (k % 3) * 0.86 - 0.86 + (k > 2 ? 0.43 : 0), ly(9, 4) + 0.42 + (k > 2 ? 0.74 : 0), 4, g);
@@ -494,61 +536,81 @@ function buildWorkshop(r) {
   });
 }
 
-function buildRuins(r) {
+/* 創生市集：社區總體營造、創新產業、商業空間與設計經營 */
+function buildMarket(r) {
   const { g, ly, col } = regionCtx(r);
-  const stone = mat('#d3cadb'), stone2 = mat('#ada3bd'), moss = mat('#71905c');
-  const rune = mat('#2f2840', { emissive: '#b896ff', emissiveIntensity: 1 });
-  // 中央階梯平台與石碑
-  [[4.4, 0.5], [3.4, 1.0], [2.4, 1.5]].forEach(([rad, y]) => mesh(new THREE.CylinderGeometry(rad, rad + 0.2, 0.5, 10), stone2, 0, y - 0.25 + 0.25, 0, g));
-  mesh(new THREE.BoxGeometry(1.4, 4.4, 0.7), mat('#4b4262'), 0, 3.95, 0, g);
-  const glyph = mesh(new THREE.BoxGeometry(0.7, 2.6, 0.08), rune, 0, 4.1, 0.38, g); glyph.castShadow = false;
-  const glyphB = mesh(new THREE.BoxGeometry(0.7, 2.6, 0.08), rune, 0, 4.1, -0.38, g); glyphB.castShadow = false;
-  col(0, 0, 4.5);
-  // 環形柱廊
-  const N = 12, R = 8.5, full = [];
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2 + 0.13;
-    const u = Math.cos(a) * R, v = Math.sin(a) * R;
-    if (v > 6.5 && Math.abs(u) < 3.5) { full.push(false); continue; } // 留出入口
-    const isFull = i % 3 !== 1;
-    const h = isFull ? 6 : 1.6 + hash2(i, 4) * 2.2;
-    const y = ly(u, v);
-    mesh(new THREE.BoxGeometry(1.6, 0.45, 1.6), stone2, u, y + 0.22, v, g);
-    const c = mesh(new THREE.CylinderGeometry(0.52, 0.6, h, 10), stone, u, y + 0.45 + h / 2, v, g);
-    if (!isFull) c.rotation.z = (hash2(i, 2) - 0.5) * 0.2;
-    if (isFull) mesh(new THREE.BoxGeometry(1.5, 0.45, 1.5), stone2, u, y + 0.45 + h + 0.22, v, g);
-    if (i % 4 === 0) mesh(new THREE.BoxGeometry(1.7, 0.2, 1.7), moss, u, y + 0.5, v, g);
-    full.push(isFull ? { u, v, top: y + 0.45 + h + 0.45 } : false);
-    col(u, v, 0.85);
+  const wood = mat('#8a5a33'), plank = mat('#c9a06a'), plaster = mat('#f1e6d2'), bark = mat('#6b4a2f'), red = mat('#b8392e');
+  const AWN = ['#e5484d', '#f5c518', '#3a8ee6', '#46b35b', '#f28c28', '#8b5cd6'];
+  // 中央廣場與大榕樹：社區聚會的地方
+  mesh(new THREE.CylinderGeometry(7.5, 7.8, 0.3, 24), mat('#dccaa4'), 0, 0.05, 0, g);
+  mesh(new THREE.CylinderGeometry(0.9, 1.5, 6, 8), bark, 0, 3, 0, g);
+  for (const [x, z] of [[1.1, 0.3], [-1, 0.5], [0.2, -1.1]]) {
+    const b = mesh(new THREE.CylinderGeometry(0.3, 0.5, 4, 6), bark, x, 5.5, z, g); b.rotation.set(z * 0.4, 0, -x * 0.4);
   }
-  for (let i = 0; i < N; i++) {
-    const a = full[i], b = full[(i + 1) % N];
-    if (!a || !b) continue;
-    const len = Math.hypot(b.u - a.u, b.v - a.v);
-    const l = mesh(new THREE.BoxGeometry(len + 1.2, 0.6, 1.1), stone, (a.u + b.u) / 2, Math.min(a.top, b.top) + 0.3, (a.v + b.v) / 2, g);
-    l.rotation.y = -Math.atan2(b.v - a.v, b.u - a.u);
+  [[0, 8.2, 0, 4.2], [3, 7, 1, 2.8], [-3, 7.2, -0.8, 3], [1, 7.4, -3, 2.6], [-1.5, 7.6, 2.8, 2.5]].forEach(([x, y, z, sz], i) => {
+    mesh(new THREE.IcosahedronGeometry(sz, 0), mat(i % 2 ? '#6aa84f' : '#4f8f45'), x, y, z, g);
+  });
+  for (let k = 0; k < 9; k++) { // 氣根
+    const a = k / 9 * Math.PI * 2 + 0.3, d = 2.6 + hash2(k, 3) * 1.2, h = 3 + hash2(k, 4) * 1.5;
+    mesh(new THREE.CylinderGeometry(0.06, 0.08, h, 4), bark, Math.cos(a) * d, 6 - h / 2, Math.sin(a) * d, g).castShadow = false;
   }
-  // 古城門（路徑穿過）
-  for (const s of [-1, 1]) {
-    mesh(new THREE.BoxGeometry(1.8, 7.5, 1.8), stone, s * 3.4, ly(s * 3.4, 19) + 3.75, 19, g);
-    col(s * 3.4, 19, 1.3);
+  const seat = mesh(new THREE.TorusGeometry(2.4, 0.32, 6, 24), plank, 0, 0.75, 0, g); seat.rotation.x = Math.PI / 2;
+  col(0, 0, 2.9);
+  // 攤棚：環繞廣場，正面（訪客方向）留給導師與入口
+  const facing = (u, v) => Math.atan2(-u, -v);
+  [0.95, 1.18, 1.42, 1.6, 1.84, 0.06].forEach((k, i) => {
+    const a = k * Math.PI, u = Math.cos(a) * 11, v = Math.sin(a) * 11;
+    const st = new THREE.Group(); st.position.set(u, ly(u, v), v); st.rotation.y = facing(u, v); g.add(st);
+    mesh(new THREE.BoxGeometry(3, 1, 1.2), plank, 0, 0.5, 0.3, st);
+    for (const [x, z] of [[-1.45, -0.55], [1.45, -0.55], [-1.45, 0.85], [1.45, 0.85]]) mesh(new THREE.BoxGeometry(0.12, 2.7, 0.12), wood, x, 1.35, z, st);
+    for (let k2 = 0; k2 < 4; k2++) { // 條紋遮陽棚
+      const aw = mesh(new THREE.BoxGeometry(0.85, 0.1, 2), mat(k2 % 2 ? '#f6efe2' : AWN[i]), -1.275 + k2 * 0.85, 2.75, 0.2, st);
+      aw.rotation.x = 0.22;
+    }
+    for (let k2 = 0; k2 < 3; k2++) {
+      const c = AWN[(i + k2 + 2) % 6];
+      mesh(k2 === 1 ? new THREE.SphereGeometry(0.28, 8, 6) : new THREE.BoxGeometry(0.5, 0.4, 0.4), mat(c), -0.9 + k2 * 0.9, 1.22, 0.4, st);
+    }
+    col(u, v, 1.9);
+  });
+  // 商店街：大面展示櫥窗與招牌（商業空間）
+  const signMat = mat(r.color, { emissive: r.color, emissiveIntensity: 0.6 });
+  const glass = mat('#ffe2a8', { emissive: '#ffb347', emissiveIntensity: 0.8 });
+  for (const [u, v] of [[-8, -17], [8, -17], [0, -20]]) {
+    const sh = new THREE.Group(); sh.position.set(u, ly(u, v), v); sh.rotation.y = facing(u, v); g.add(sh);
+    mesh(new THREE.BoxGeometry(6.4, 5, 4.6), plaster, 0, 2.5, 0, sh);
+    mesh(new THREE.BoxGeometry(6.8, 0.5, 5), mat('#5a4636'), 0, 5.2, 0, sh);
+    mesh(new THREE.BoxGeometry(4.6, 2.4, 0.12), glass, -0.4, 1.6, 2.32, sh).castShadow = false;
+    mesh(new THREE.BoxGeometry(1, 2.4, 0.12), mat('#3a2a1e'), 2.4, 1.2, 2.32, sh);
+    mesh(new THREE.BoxGeometry(4, 0.8, 0.2), signMat, 0, 3.6, 2.4, sh);
+    col(u, v, 3.6);
   }
-  const gy = Math.max(ly(-3.4, 19), ly(3.4, 19)) + 7.5;
-  mesh(new THREE.BoxGeometry(9.2, 1.3, 2.1), stone2, 0, gy + 0.6, 19, g);
-  mesh(new THREE.BoxGeometry(3, 0.8, 2.2), stone, 0, gy + 1.6, 19, g);
-  // 倒下的柱子與散落石塊
-  const fallen = mesh(new THREE.CylinderGeometry(0.55, 0.6, 6, 10), stone, 13, ly(13, -6) + 0.55, -6, g);
-  fallen.rotation.set(0, 0.4, Math.PI / 2);
-  col(13, -6, 2.6);
-  for (let k = 0; k < 12; k++) {
-    const a = hash2(k, 11) * Math.PI * 2, d = 11 + hash2(k, 5) * 10;
-    const u = Math.cos(a) * d, v = Math.sin(a) * d;
-    if (v > 8 && Math.abs(u) < 6) continue;
-    const b = mesh(new THREE.BoxGeometry(0.8 + hash2(k, 1), 0.6 + hash2(k, 2) * 0.6, 0.8 + hash2(k, 3)), k % 3 ? stone2 : moss, u, ly(u, v) + 0.3, v, g);
-    b.rotation.y = hash2(k, 9) * 3;
+  // 燈串：從榕樹拉向廣場周邊的燈柱
+  const bulbA = mat('#fff1c4', { emissive: '#ffcf6b', emissiveIntensity: 1.2 });
+  const bulbB = mat('#ffd6e0', { emissive: '#ff8fa8', emissiveIntensity: 1.2 });
+  [1.07, 1.3, 1.72, 1.95, 0.0].forEach((k, i) => {
+    const a = k * Math.PI, u = Math.cos(a) * 8, v = Math.sin(a) * 8, y0 = ly(u, v);
+    mesh(new THREE.CylinderGeometry(0.1, 0.12, 5, 6), wood, u, y0 + 2.5, v, g);
+    col(u, v, 0.3);
+    for (let b = 1; b < 8; b++) {
+      const t = b / 8, x = u * t, z = v * t, y = 6.2 + (y0 + 5 - 6.2) * t - Math.sin(Math.PI * t) * 0.9;
+      mesh(new THREE.SphereGeometry(0.13, 6, 5), (b + i) % 2 ? bulbA : bulbB, x, y, z, g).castShadow = false;
+    }
+  });
+  // 牌樓入口（路徑穿過）
+  for (const sgn of [-1, 1]) {
+    mesh(new THREE.BoxGeometry(0.8, 6.5, 0.8), red, sgn * 3.4, ly(sgn * 3.4, 19) + 3.25, 19, g);
+    col(sgn * 3.4, 19, 0.7);
   }
-  sparkles(g, 90, '#cdb6ff', 13, 0.5, 9, 0.55, 0.6);
-  animators.push((t) => { rune.emissiveIntensity = 0.75 + Math.sin(t * 2) * 0.45; });
+  const gy = Math.max(ly(-3.4, 19), ly(3.4, 19)) + 6.5;
+  mesh(new THREE.BoxGeometry(8.6, 0.6, 1), red, 0, gy - 0.6, 19, g);
+  mesh(new THREE.BoxGeometry(9.6, 0.5, 1.8), mat('#3d5a8a'), 0, gy + 0.1, 19, g);
+  mesh(new THREE.BoxGeometry(3.2, 1, 0.2), signMat, 0, gy - 1.5, 19.55, g);
+  sparkles(g, 70, '#ffd59a', 12, 0.5, 8, 0.5, 0.5);
+  animators.push((t) => {
+    bulbA.emissiveIntensity = 1 + Math.sin(t * 2.2) * 0.4;
+    bulbB.emissiveIntensity = 1 + Math.sin(t * 2.2 + Math.PI) * 0.4;
+  });
 }
 
 function buildPlateau(r) {
@@ -613,7 +675,7 @@ function buildPlateau(r) {
   });
 }
 
-const BUILDERS = { capital: buildCapital, forest: buildForest, valley: buildValley, workshop: buildWorkshop, ruins: buildRuins, plateau: buildPlateau };
+const BUILDERS = { capital: buildCapital, forest: buildForest, valley: buildValley, workshop: buildWorkshop, market: buildMarket, plateau: buildPlateau };
 regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
 
 /* ---------- 植被與岩石 ---------- */
@@ -730,9 +792,10 @@ function buildHat(r, g) {
   } else if (id === 'workshop') {
     mesh(new THREE.SphereGeometry(0.64, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat('#7a4a2a'), 0, 3.05, 0, g);
     mesh(new THREE.BoxGeometry(0.8, 0.06, 0.45), mat('#5c3820'), 0, 3.08, 0.62, g);
-  } else if (id === 'ruins') {
-    const hood = mesh(new THREE.SphereGeometry(0.74, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), mat('#5d4e86', { side: THREE.DoubleSide }), 0, 2.9, -0.08, g);
-    hood.rotation.x = -0.35;
+  } else if (id === 'market') {
+    mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.06, 18), mat('#d9b56b'), 0, 3.3, 0, g);
+    mesh(new THREE.CylinderGeometry(0.5, 0.58, 0.5, 14), mat('#d9b56b'), 0, 3.56, 0, g);
+    mesh(new THREE.CylinderGeometry(0.585, 0.585, 0.14, 14), mat('#3a6fc0'), 0, 3.4, 0, g);
   } else if (id === 'plateau') {
     const b = mesh(new THREE.CylinderGeometry(0.74, 0.6, 0.22, 16), mat('#c2366b'), 0.06, 3.42, 0, g); b.rotation.z = -0.2;
     mesh(new THREE.SphereGeometry(0.1, 6, 5), mat('#c2366b'), 0.1, 3.58, 0, g);
@@ -1223,15 +1286,14 @@ function openCard(f) {
       <div class="dossier-main">
         <span class="cls-tag"><i></i>${esc(r.name)} · ${esc(f.cls)}</span>
         <h3 id="card-name">${esc(f.name)}</h3>
-        <p class="role"><b>${esc(f.title)}</b>　${esc(f.edu)}</p>
+        <p class="role">${f.adjunct ? '<span class="adj-tag">兼任</span>' : ''}<b>${esc(f.title)}</b>${f.edu ? `　${esc(f.edu)}` : ''}</p>
         <section class="sect"><h4>專長技能</h4><div class="skills">${f.fields.map((x) => `<span class="skill">${esc(x)}</span>`).join('')}</div></section>
-        <section class="sect"><h4>傳授技能書</h4><ul class="tomes">${f.courses.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>
-        ${f.feats && f.feats.length ? `<section class="sect"><h4>冒險紀錄</h4><ul class="feats">${f.feats.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
-        <div class="contact">
-          <span class="mail">${esc(f.email)}</span>
-          <button class="copy" type="button">複製信箱</button>
-          ${f.url ? `<a class="site" href="${esc(f.url)}" target="_blank" rel="noopener">個人網站 ↗</a>` : ''}
-        </div>
+        ${f.courses?.length ? `<section class="sect"><h4>傳授技能書</h4><ul class="tomes">${f.courses.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
+        ${f.feats?.length ? `<section class="sect"><h4>冒險紀錄</h4><ul class="feats">${f.feats.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>` : ''}
+        ${f.email || f.url ? `<div class="contact">
+          ${f.email ? `<span class="mail">${esc(f.email)}</span><button class="copy" type="button">複製信箱</button>` : ''}
+          ${f.url ? `<a class="site" href="${esc(f.url)}" target="_blank" rel="noopener">${f.adjunct ? '相關資料' : '個人網站'} ↗</a>` : ''}
+        </div>` : ''}
       </div>
     </div>
     <nav class="card-nav">
@@ -1241,7 +1303,7 @@ function openCard(f) {
     </nav>`;
   fixBrokenPhotos(sheet);
   sheet.querySelector('.close').addEventListener('click', closeCard);
-  sheet.querySelector('.copy').addEventListener('click', (e) => {
+  sheet.querySelector('.copy')?.addEventListener('click', (e) => {
     const btn = e.currentTarget, mail = sheet.querySelector('.mail');
     const done = () => { btn.textContent = '已複製'; setTimeout(() => (btn.textContent = '複製信箱'), 1600); };
     const fallback = () => { const rg = document.createRange(); rg.selectNodeContents(mail); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(rg); btn.textContent = '已選取，請按複製'; };
@@ -1292,18 +1354,19 @@ chips.addEventListener('click', (e) => {
 $('#codex-search').addEventListener('input', (e) => { state.filter = e.target.value.trim().toLowerCase(); renderCodex(); });
 
 const SYN = {
-  ai: ['人工智慧', '生成式', '運算化'], aigc: ['生成式人工智慧'], 人工智慧: ['人工智慧'], 程式: ['運算化', '電腦輔助'],
-  數位: ['數位', '電腦', '運算化', 'bim'], '3d': ['電腦輔助', '數位製作', 'bim'], 電腦: ['電腦', '運算化', 'bim'],
-  木: ['木作', '木工', '家具'], 家具: ['家具', '傢飾', '木作'], 材料: ['材料', '建材'],
-  色: ['色彩', '繪畫', '水彩', '油畫'], 畫: ['繪畫', '素描', '水彩', '油畫'], 品牌: ['品牌', '識別', 'vis'],
-  史: ['史', '文化資產', '後殖民'], 文化: ['文化', '客家', '聚落'], 環境: ['環境', 'iaq', '空氣', '聲學', 'cfd'],
-  健康: ['空氣品質', '環境'], 研究: ['量化研究', 'sem', '研究'], 統計: ['sem', '量化研究']
+  人工智慧: ['ai', '生成式'], 運算: ['設計運算', '運算化'], 程式: ['設計運算', '運算化', 'rhino'],
+  數位: ['數位', '設計運算', 'bim', 'rhino'], '3d': ['數位製造', 'bim', 'rhino'], 電腦: ['數位', '設計運算', 'bim'],
+  木: ['木構造', '木工'], 構造: ['構造', '構築', '結構'], 結構: ['構造', '構築', '結構'], 材料: ['材料', '建材'],
+  永續: ['永續', '循環', '建材環境'], 環境: ['環境', '空氣品質', '循環'], 健康: ['空氣品質', '環境'], 智慧: ['智慧生活', '互動'],
+  社區: ['社區', '營造'], 產業: ['產業', '經營'], 商業: ['商業空間', '經營'], 經營: ['經營管理', '產業'],
+  色: ['色彩', '美學'], 美學: ['美學', '風格'], 風格: ['美學', '風格'], 品牌: ['品牌', '識別'],
+  兼任: ['兼任'], 研究: ['研究']
 };
 function matches(f) {
   if (state.regionFilter && f.region !== state.regionFilter) return false;
   if (!state.filter) return true;
   const r = RG[f.region] || {};
-  const hay = [f.name, f.title, f.cls, f.edu, r.name, ...f.fields, ...f.courses, ...(f.feats || [])].join(' ').toLowerCase();
+  const hay = [f.name, f.title, f.cls, f.edu, r.name, ...f.fields, ...(f.courses || []), ...(f.feats || [])].join(' ').toLowerCase();
   return state.filter.split(/\s+/).every((w) => hay.includes(w) || (SYN[w] || []).some((x) => hay.includes(x.toLowerCase())));
 }
 function renderCodex() {
@@ -1330,12 +1393,12 @@ function renderCodex() {
       <button type="button" data-region="${r.id}"><i></i><b>${esc(r.name)}</b><small>${v} / ${r.teachers.length}</small></button>
       ${ts.map((f) => `<button type="button" class="t-row" data-t="${f.id}" style="--region:${r.color}">
         <span class="avatar">${photoHTML(f)}</span>
-        <span class="who"><b>${esc(f.name)}</b><small>${esc(f.cls)}｜${esc(f.fields.slice(0, 3).join('、'))}</small></span>
+        <span class="who"><b>${esc(f.name)}${f.adjunct ? '<span class="adj-tag">兼任</span>' : ''}</b><small>${esc(f.cls)}｜${esc(f.fields.slice(0, 3).join('、'))}</small></span>
         <span class="mark ${visited.has(f.id) ? 'ok' : ''}">${visited.has(f.id) ? '✓ 已拜訪' : '未拜訪'}</span>
       </button>`).join('')}
     </div>`;
   });
-  list.innerHTML = html || `<p class="empty-note">找不到符合「${esc(state.filter)}」的導師。<br>試試「設計」「AI」「材料」等關鍵字。</p>`;
+  list.innerHTML = html || `<p class="empty-note">找不到符合「${esc(state.filter)}」的導師。<br>試試「AI」「永續」「社區」等關鍵字。</p>`;
   fixBrokenPhotos(list);
   npcs.forEach((n) => n.label.classList.toggle('dim', active && !matches(n.f)));
   npcs.forEach((n) => n.marker.scale.setScalar(active && matches(n.f) ? 1.6 : 1));

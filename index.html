@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>南應大室研所大冒險</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<meta name="description" content="台南應用科技大學室內設計系碩士班招生互動網站：在 3D 奇幻大陸上探險，拜訪 14 位導師，認識他們的研究專長。">
+<meta name="description" content="台南應用科技大學室內設計系碩士班招生互動網站：在 3D 奇幻大陸上探險，拜訪 12 位研究所導師，認識他們的研究專長。">
 <meta property="og:title" content="南應大室研所大冒險｜南應大室內設計系碩士班師資探險地圖">
-<meta property="og:description" content="在 3D 奇幻大陸上拜訪 14 位導師，找到最適合你的指導教授。">
+<meta property="og:description" content="在 3D 奇幻大陸上拜訪 12 位研究所導師，找到最適合你的指導教授。">
 <!-- 分享預覽圖需要完整網址；若網站改放學校主機，請一併修改下面兩個網址 -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://t60011gm.github.io/tut-id-quest/">
@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 
@@ -35,11 +35,11 @@
     </div>
   </div>
   <div class="progress plate" aria-live="polite">
-    <span id="prog-text">已拜訪 <b>0</b> / 14 位導師</span>
+    <span id="prog-text">已拜訪 <b>0</b> / 12 位導師</span>
     <div class="bar"><i id="prog-bar"></i></div>
   </div>
   <nav class="actions">
-    <span class="btn mobile-progress" id="prog-mini">0 / 14</span>
+    <span class="btn mobile-progress" id="prog-mini">0 / 12</span>
     <button class="btn" id="btn-mode" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><path d="M12 8v6l-3 6M12 14l3 6M8 11h8"/></svg>
       <span id="mode-label">探險<span class="lbl-long">模式</span></span>
@@ -82,7 +82,7 @@
   </div>
   <label class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    <input id="codex-search" type="search" placeholder="搜尋專長或課程，例如：AI、木作、色彩" autocomplete="off">
+    <input id="codex-search" type="search" placeholder="搜尋專長或課程，例如：AI、木構造、社區" autocomplete="off">
   </label>
   <div class="chips" id="codex-chips"></div>
   <div class="codex-list" id="codex-list"></div>
@@ -102,13 +102,13 @@
     <p class="sub"><span>台南應用科技大學 室內設計系碩士班</span><span class="sep"> · </span><span>師資探險地圖</span></p>
     <p class="lore">在這片大陸上，<b>六個區域</b>各自守護著一門設計技藝。<br>
       除了王都，<b>未探索的區域都被白霧遮蔽</b>，走近或點擊旗幟才會散去。<br>
-      驅散迷霧、拜訪<b>十四位導師</b>，找到你的指導教授。</p>
+      驅散迷霧、拜訪<b>十二位導師</b>，找到你的指導教授。</p>
     <div class="ctrl">
       <div class="plate"><b>導覽模式</b><span>拖曳旋轉視角、滾輪縮放；點擊區域旗幟或導師名牌，鏡頭會飛過去。</span></div>
       <div class="plate"><b>探險模式</b><span>用 WASD 或方向鍵（手機用搖桿）走動，靠近導師按 E 或「對話」。</span></div>
     </div>
     <button class="btn primary go" id="btn-start" type="button">開始冒險</button>
-    <div class="fine">師資資料取自本系網站「專任師資」頁面</div>
+    <div class="fine">師資資料取自本系研究所師資名單與系網師資頁面</div>
   </div>
 </div>
 
@@ -117,7 +117,7 @@
   <div class="title-card">
     <div class="eyebrow">QUEST COMPLETE</div>
     <h1>大陸已走遍</h1>
-    <p class="lore">你已拜訪全部 <b>十四位導師</b>。<br>下一段旅程，從報考碩士班開始。</p>
+    <p class="lore">你已拜訪全部 <b>十二位導師</b>。<br>下一段旅程，從報考碩士班開始。</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
       <a class="btn primary go" id="cta-admissions" target="_blank" rel="noopener">招生資訊</a>
       <a class="btn go" id="cta-master" target="_blank" rel="noopener">碩士班介紹</a>
@@ -131,7 +131,7 @@
   <p>你的瀏覽器無法顯示 3D 地圖。請改用新版 Chrome、Edge 或 Safari 開啟，<br>或直接前往 <a href="https://id.tut.edu.tw/p/403-1067-1265.php?Lang=zh-tw">本系師資頁面</a>。</p>
 </div>
 
-<script src="data/faculty.js?v=3"></script>
+<script src="data/faculty.js?v=4"></script>
 <script type="importmap">
 {
   "imports": {
@@ -141,6 +141,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=3"></script>
+<script type="module" src="js/main.js?v=4"></script>
 </body>
 </html>

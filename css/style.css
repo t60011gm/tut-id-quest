@@ -92,8 +92,8 @@ button { cursor: pointer; }
 .t-row.locked .avatar { background: #2e313a; border-color: #5b5f6b; color: #a9adb8; }
 .t-row.locked .who b { color: var(--ink-light-dim); letter-spacing: .2em; }
 .t-row.locked .who small { font-style: normal; }
-.region-block.locked > button i { background: #6b6f7a; }
-.region-block.locked > button small { color: #c3c7d0; }
+.region-block.locked > button:not(.t-row) i { background: #6b6f7a; }
+.region-block.locked > button:not(.t-row) small { color: #c3c7d0; }
 
 /* ---------- HUD ---------- */
 .plate {
@@ -198,6 +198,14 @@ button { cursor: pointer; }
 #tip p b { color: var(--brass); }
 #tip .icon-btn { width: 30px; height: 30px; }
 
+/* 兼任老師標籤（圖鑑深底、導師卡羊皮紙都適用） */
+.adj-tag {
+  display: inline-block; margin: 0 6px 0 0; padding: 1px 6px; vertical-align: 2px;
+  border: 1px solid currentColor; border-radius: 4px;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; opacity: .8;
+}
+.who .adj-tag { margin: 0 0 0 6px; }
+
 /* ---------- 圖鑑抽屜 ---------- */
 #codex {
   position: fixed; z-index: 30; top: 0; right: 0; bottom: 0;
@@ -233,15 +241,15 @@ button { cursor: pointer; }
 .chips button:hover, .chips button.on { color: var(--ink-light); border-color: var(--brass); background: rgba(226,180,92,.12); }
 .codex-list { flex: 1; overflow-y: auto; margin-right: -8px; padding-right: 8px; display: grid; gap: 14px; align-content: start; }
 .region-block { display: grid; gap: 6px; }
-.region-block > button {
+.region-block > button:not(.t-row) {
   display: flex; align-items: baseline; gap: 10px; text-align: left;
   background: none; border: 0; padding: 2px 0; border-bottom: 1px solid rgba(243,233,210,.12);
   padding-bottom: 6px;
 }
-.region-block > button b { font-family: var(--f-display); font-weight: 900; font-size: 16px; letter-spacing: .1em; }
-.region-block > button i { width: 10px; height: 10px; transform: rotate(45deg); background: var(--region); flex: none; align-self: center; }
-.region-block > button small { margin-left: auto; font-size: 11px; color: var(--ink-light-dim); font-variant-numeric: tabular-nums; }
-.region-block > button:hover b { color: var(--brass); }
+.region-block > button:not(.t-row) b { font-family: var(--f-display); font-weight: 900; font-size: 16px; letter-spacing: .1em; }
+.region-block > button:not(.t-row) i { width: 10px; height: 10px; transform: rotate(45deg); background: var(--region); flex: none; align-self: center; }
+.region-block > button:not(.t-row) small { margin-left: auto; font-size: 11px; color: var(--ink-light-dim); font-variant-numeric: tabular-nums; }
+.region-block > button:not(.t-row):hover b { color: var(--brass); }
 .t-row {
   display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 7px 8px; border-radius: 8px; border: 1px solid transparent; background: none; text-align: left; width: 100%;
