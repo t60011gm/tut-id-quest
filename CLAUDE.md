@@ -1,4 +1,4 @@
-# CLAUDE.md — 設域大陸
+# CLAUDE.md — 南應室研大陸
 
 台南應用科技大學室內設計系碩士班招生用的 3D 互動網站。純靜態網站（無建置步驟），部署在 GitHub Pages。
 
@@ -11,6 +11,7 @@
 - `js/main.js`：ES module。主要段落依序為：地形高度函式 `terrainInfo()` → 地形網格 → NPC 站位 → 各區域地標 `build<Region>()` → 植被 → NPC → 玩家 → 控制（導覽 OrbitControls／探險第三人稱）→ 介面（導師卡、圖鑑、小地圖）→ 主迴圈。
 - 每個區域地標在 `regionCtx(r)` 的區域座標系中建構：local +z 永遠指向王都（訪客來的方向），NPC 站在 local v≈12 處面向訪客。
 - `colliders` 陣列是探險模式的碰撞圓；`animators` 陣列是每幀更新函式。
+- 黑霧：`explored` Set（localStorage `tutIdQuest.explored.v1`）記錄已探索區域，王都預設已探索。`buildFog(r)` 建霧、`reveal(r)` 驅散並播放消散動畫、`applyFogState()` 同步名牌與旗幟。迷霧中的導師在圖鑑顯示為「？？？」，小地圖也會遮住。
 - `css/style.css`：單一深色主題，所有顏色來自 `:root` token。導師卡是羊皮紙風格（淺底深字），其他 HUD 是深藍底黃銅邊。
 
 ## 慣例

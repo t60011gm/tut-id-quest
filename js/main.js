@@ -1,5 +1,5 @@
 /* =========================================================================
- * 設域大陸 · 主程式
+ * 南應室研大陸 · 主程式
  * Three.js 建構的奇幻大陸：地形、六大區域地標、導師 NPC、
  * 「導覽模式」（點擊飛行）與「探險模式」（操控角色走動），以及所有介面。
  * 師資與區域內容請改 data/faculty.js，不需要動這個檔案。
@@ -789,7 +789,7 @@ regions.forEach((r) => {
   const el = document.createElement('button');
   el.type = 'button'; el.className = 'region-sign';
   el.style.setProperty('--region', r.color);
-  el.innerHTML = `<i>${esc(RUNE[r.id] || r.id.toUpperCase())}</i><b>${esc(r.name)}</b>`;
+  el.innerHTML = `<i>${esc(RUNE[r.id] || r.id.toUpperCase())}</i><b>${esc(r.name)}</b><span class="fog-tag">迷霧籠罩 · 點擊驅散</span>`;
   el.setAttribute('aria-label', `前往${r.name}`);
   el.addEventListener('click', (e) => { e.stopPropagation(); goRegion(r); });
   const o = new CSS2DObject(el);
@@ -798,6 +798,83 @@ regions.forEach((r) => {
   scene.add(o);
   regionSigns.push({ r, el, pos: o.position });
 });
+
+/* =========================================================================
+ * 黑霧：未探索的區域被迷霧籠罩，抵達後散去（王都一開始就是已探索）
+ * ========================================================================= */
+const EXPLORE_KEY = 'tutIdQuest.explored.v1';
+const explored = new Set(['capital']);
+try { JSON.parse(localStorage.getItem(EXPLORE_KEY) || '[]').forEach((id) => explored.add(id)); } catch (e) { /* 無法讀取就從頭探索 */ }
+const FOG_R = 28;
+const isFogged = (r) => !!r && !explored.has(r.id);
+
+function buildFog(r) {
+  const baseY = heightAt(r.x, r.z);
+  const g = new THREE.Group(); g.position.set(r.x, baseY, r.z); scene.add(g);
+  const m = new THREE.MeshStandardMaterial({
+    color: '#15101f', emissive: '#2a1d47', emissiveIntensity: 0.4, flatShading: true,
+    roughness: 1, transparent: true, opacity: 0.94, depthWrite: false
+  });
+  const puffs = [];
+  const N = isTouch ? 36 : 48;
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * Math.PI * 2 * 3.3 + hash2(i, r.angle) * 0.8;
+    const k = Math.sqrt(hash2(i, 5.1 + r.angle));
+    const x = Math.cos(a) * k * FOG_R, z = Math.sin(a) * k * FOG_R;
+    const sz = 4 + hash2(i, 2.2) * 4.5 + (1 - k) * 2.5;
+    const y = heightAt(r.x + x, r.z + z) - baseY + sz * 0.35 + hash2(i, 8.8) * 6 + (1 - k) * 7;
+    const p = new THREE.Mesh(new THREE.IcosahedronGeometry(sz, 0), m);
+    p.position.set(x, y, z); p.scale.y = 0.85;
+    p.userData = { base: p.position.clone(), ph: hash2(i, 3) * 6.28 };
+    p.renderOrder = 2;
+    g.add(p); puffs.push(p);
+  }
+  const motes = sparkles(g, 60, '#9b7cff', FOG_R * 0.85, 1, 16, 0.75, 0.5);
+  r.fog = { g, m, puffs, motes, revealAt: null };
+}
+regions.forEach((r) => { if (isFogged(r)) buildFog(r); });
+
+animators.push((t, dt) => {
+  for (const r of regions) {
+    const f = r.fog;
+    if (!f || !f.g.parent) continue;
+    if (f.revealAt === null) {
+      f.g.rotation.y += dt * 0.035;
+      f.puffs.forEach((p) => { p.position.y = p.userData.base.y + Math.sin(t * 0.6 + p.userData.ph) * 0.6; p.rotation.y += dt * 0.1; });
+    } else {
+      const k = Math.min(1, (performance.now() - f.revealAt) / 1900);
+      const e = 1 - (1 - k) * (1 - k);
+      f.m.opacity = 0.94 * (1 - e);
+      f.motes.material.opacity = 1 - e;
+      f.puffs.forEach((p) => {
+        const b = p.userData.base;
+        p.position.set(b.x * (1 + e * 0.9), b.y + e * 12, b.z * (1 + e * 0.9));
+        p.scale.set(1 + e, (1 + e) * 0.85, 1 + e);
+      });
+      if (k >= 1) scene.remove(f.g);
+    }
+  }
+});
+
+function applyFogState() {
+  regionSigns.forEach((sg) => {
+    const fog = isFogged(sg.r);
+    sg.el.classList.toggle('fogged', fog);
+    sg.el.setAttribute('aria-label', fog ? `驅散迷霧，前往${sg.r.name}` : `前往${sg.r.name}`);
+  });
+  npcs.forEach((n) => { const fog = isFogged(n.r); n.label.classList.toggle('fogged', fog); n.marker.visible = !fog; });
+}
+/* 驅散一個區域的迷霧；回傳是否真的有迷霧被驅散 */
+function reveal(r) {
+  if (!isFogged(r)) return false;
+  explored.add(r.id);
+  try { localStorage.setItem(EXPLORE_KEY, JSON.stringify([...explored])); } catch (e) { /* 忽略 */ }
+  if (r.fog) { if (reduceMotion) scene.remove(r.fog.g); else r.fog.revealAt = performance.now(); }
+  applyFogState();
+  refreshProgress();
+  return true;
+}
+applyFogState();
 
 /* =========================================================================
  * 玩家角色
@@ -870,18 +947,27 @@ function goRegion(r) {
   closeCodexIfNarrow();
   if (state.mode === 'explore') {
     teleport(r.approach.x, r.approach.z, Math.atan2(r.toward.x, r.toward.y));
-    showToast(r);
+    showToast(r, reveal(r));
   } else {
-    flyTo(viewForRegion(r), () => showToast(r));
+    flyTo(viewForRegion(r), () => showToast(r, reveal(r)));
   }
 }
 function selectTeacher(f, { fromCodex = false } = {}) {
-  const n = f.npc;
+  const n = f.npc, r = RG[f.region] || RG.capital;
   if (fromCodex) closeCodexIfNarrow();
+  const fogged = isFogged(r);
+  const wait = reduceMotion ? 0 : 1600;
   if (state.mode === 'explore') {
     const s = f.slot;
-    if (fromCodex || player.position.distanceTo(n.pos) > 14) teleport(s.x + s.fx * 4.5, s.z + s.fz * 4.5, Math.atan2(s.fx, s.fz));
-    openCard(f);
+    if (fromCodex || fogged || player.position.distanceTo(n.pos) > 14) teleport(s.x + s.fx * 4.5, s.z + s.fz * 4.5, Math.atan2(s.fx, s.fz));
+    if (fogged) { showToast(r, reveal(r)); setTimeout(() => openCard(f), wait); }
+    else openCard(f);
+  } else if (fogged) {
+    // 先飛到區域看迷霧散去，再靠近導師
+    flyTo(viewForRegion(r), () => {
+      showToast(r, reveal(r));
+      setTimeout(() => flyTo(viewForNPC(n), () => openCard(f), 1.3), wait);
+    });
   } else {
     flyTo(viewForNPC(n), () => openCard(f), 1.5);
   }
@@ -1057,7 +1143,7 @@ function saveVisited() { try { localStorage.setItem(STORE_KEY, JSON.stringify([.
 
 function refreshProgress() {
   const n = faculty.filter((f) => visited.has(f.id)).length, total = faculty.length;
-  $('#prog-text').innerHTML = `已拜訪 <b>${n}</b> / ${total} 位導師`;
+  $('#prog-text').innerHTML = `已拜訪 <b>${n}</b> / ${total} 位導師 · 探索 <b>${explored.size}</b> / ${regions.length} 區`;
   $('#prog-bar').style.width = `${(n / total) * 100}%`;
   $('#prog-mini').textContent = `${n} / ${total}`;
   npcs.forEach((np) => {
@@ -1129,6 +1215,7 @@ function openCard(f) {
   });
   sheet.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => {
     const next = faculty[(f.index + Number(b.dataset.nav) + faculty.length) % faculty.length];
+    if (isFogged(RG[next.region])) { closeCard(); selectTeacher(next); return; }
     if (state.mode === 'tour') flyTo(viewForNPC(next.npc), null, 1.2);
     else { const s = next.slot; teleport(s.x + s.fx * 4.5, s.z + s.fz * 4.5, Math.atan2(s.fx, s.fz)); }
     openCard(next);
@@ -1191,6 +1278,17 @@ function renderCodex() {
     if (!ts.length) return;
     shown += ts.length;
     const v = r.teachers.filter((f) => visited.has(f.id)).length;
+    if (isFogged(r)) {
+      html += `<div class="region-block locked" style="--region:${r.color}">
+        <button type="button" data-region="${r.id}"><i></i><b>${esc(r.name)}</b><small>迷霧中</small></button>
+        ${ts.map((f) => `<button type="button" class="t-row locked" data-t="${f.id}">
+          <span class="avatar">?</span>
+          <span class="who"><b>？？？</b><small>迷霧籠罩，點擊前往驅散</small></span>
+          <span class="mark">未探索</span>
+        </button>`).join('')}
+      </div>`;
+      return;
+    }
     html += `<div class="region-block" style="--region:${r.color}">
       <button type="button" data-region="${r.id}"><i></i><b>${esc(r.name)}</b><small>${v} / ${r.teachers.length}</small></button>
       ${ts.map((f) => `<button type="button" class="t-row" data-t="${f.id}" style="--region:${r.color}">
@@ -1224,11 +1322,11 @@ function updateHint() {
 
 /* 區域抵達提示 */
 let toastTimer = null;
-function showToast(r) {
+function showToast(r, revealed = false) {
   state.currentRegion = r;
   $('#toast-rune').textContent = RUNE[r.id] || '';
   $('#toast-name').textContent = r.name;
-  $('#toast-motto').textContent = r.motto;
+  $('#toast-motto').textContent = revealed ? `迷霧散去 · ${r.motto}` : r.motto;
   const t = $('#toast'); t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
@@ -1261,12 +1359,20 @@ function drawMinimap() {
   mctx.beginPath(); mctx.arc(MM / 2, MM / 2, MM / 2 - 2, 0, Math.PI * 2); mctx.clip();
   mctx.drawImage(mmBase, 0, 0);
   regions.forEach((r) => {
+    if (!isFogged(r)) return;
+    const [x, y] = toMap(r.x, r.z), rad = (FOG_R * 1.15) / (WORLD_HALF * 2) * MM;
+    const gr = mctx.createRadialGradient(x, y, rad * 0.35, x, y, rad);
+    gr.addColorStop(0, 'rgba(18,12,30,0.95)'); gr.addColorStop(1, 'rgba(18,12,30,0)');
+    mctx.fillStyle = gr; mctx.beginPath(); mctx.arc(x, y, rad, 0, Math.PI * 2); mctx.fill();
+  });
+  regions.forEach((r) => {
     const [x, y] = toMap(r.x, r.z);
     mctx.save(); mctx.translate(x, y); mctx.rotate(Math.PI / 4);
     mctx.fillStyle = r.color; mctx.strokeStyle = '#141a2e'; mctx.lineWidth = 3;
     mctx.fillRect(-9, -9, 18, 18); mctx.strokeRect(-9, -9, 18, 18); mctx.restore();
   });
   npcs.forEach((n) => {
+    if (isFogged(n.r)) return;
     const [x, y] = toMap(n.pos.x, n.pos.z);
     mctx.beginPath(); mctx.arc(x, y, 4.5, 0, Math.PI * 2);
     mctx.fillStyle = visited.has(n.f.id) ? '#7ee39d' : '#ffd36b'; mctx.fill();
@@ -1307,6 +1413,20 @@ $('#btn-start').addEventListener('click', () => {
   if (target) selectTeacher(target);
   else flyTo(viewForRegion(RG.capital), () => showToast(RG.capital), 2.4);
 });
+{
+  const btn = $('#btn-reset');
+  let armed = false, timer = null;
+  btn.addEventListener('click', () => {
+    if (!armed) {
+      armed = true; btn.textContent = '確定要清除進度？再按一次';
+      clearTimeout(timer); timer = setTimeout(() => { armed = false; btn.textContent = '重新開始冒險'; }, 4000);
+      return;
+    }
+    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(EXPLORE_KEY); } catch (e) { /* 忽略 */ }
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 忽略 */ }
+    location.reload();
+  });
+}
 $('#btn-mode').addEventListener('click', () => { if (!state.started) return; setMode(state.mode === 'tour' ? 'explore' : 'tour'); });
 
 refreshProgress();
@@ -1354,9 +1474,17 @@ function tick() {
   }
   if (state.mode === 'explore' && state.started) {
     let cur = null;
-    for (const r of regions) if (Math.hypot(focus.x - r.x, focus.z - r.z) < (r.id === 'capital' ? 24 : 27)) cur = r;
+    for (const r of regions) {
+      const d = Math.hypot(focus.x - r.x, focus.z - r.z);
+      if (d < FOG_R + 4 && isFogged(r)) showToast(r, reveal(r));
+      if (d < (r.id === 'capital' ? 24 : 27)) cur = r;
+    }
     if (cur && cur !== state.currentRegion) showToast(cur);
     if (!cur) state.currentRegion = null;
+  } else if (state.started && !state.flying) {
+    for (const r of regions) {
+      if (isFogged(r) && Math.hypot(focus.x - r.x, focus.z - r.z) < 16 && cp.distanceTo(focus) < 70) showToast(r, reveal(r));
+    }
   }
 
   renderer.render(scene, camera);
@@ -1375,4 +1503,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex };
+window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored };
