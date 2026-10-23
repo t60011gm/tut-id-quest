@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { initQuests, QUEST_KEY } from './quests.js?v=2';
+import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=2';
+import { installTrials } from './trials.js?v=1';
 
 const W = window.WORLD;
 const $ = (s) => document.querySelector(s);
@@ -2064,6 +2065,7 @@ function interact() {
 window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (state.card) closeCard(); else if ($('#codex').classList.contains('open')) toggleCodex(false); return; }
   if (e.code === 'Tab' && state.card) { trapFocus(e, $('#card-sheet')); return; }
+  if (state.busy) return; // 淨化、試煉、重置視窗開著時，不處理移動與對話快捷鍵
   if (e.target.closest && e.target.closest('input, textarea')) return;
   if (state.mode !== 'explore' || !state.started) return;
   if (['KeyE', 'Enter', 'Space'].includes(e.code)) { interact(); e.preventDefault(); return; }
@@ -2685,6 +2687,7 @@ const quests = initQuests({
   scene, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
   flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract, openReset
 });
+installTrials(registerTrial); // 導師試煉小遊戲（js/trials.js）
 
 const clock = new THREE.Clock();
 let firstFrame = true;

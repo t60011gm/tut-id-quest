@@ -651,3 +651,107 @@ button { cursor: pointer; }
 .reset-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 .btn.danger { background: #c8323a; border-color: #c8323a; color: #fff; }
 .btn.danger:hover { filter: brightness(1.1); }
+
+/* =========================================================================
+ * 導師試煉小遊戲（js/trials.js），畫在羊皮紙試煉視窗裡
+ * ========================================================================= */
+.trial-game { display: grid; gap: 12px; }
+.tg-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.tg-head .tg-step { font-size: 13px; color: var(--ink-soft); }
+.tg-head b { font-family: var(--f-display); font-size: 17px; }
+.tg-say { margin: 0; min-height: 1.6em; font-size: 14.5px; line-height: 1.7; text-align: center; color: var(--ink-soft); }
+.tg-say.ok { color: #23753f; font-weight: 700; }
+.tg-say.bad { color: var(--seal); font-weight: 700; }
+.tg-say.hint { color: #8a5a00; }
+.tg-timer { height: 6px; border-radius: 3px; background: rgba(44,34,22,.12); overflow: hidden; }
+.tg-timer i { display: block; height: 100%; width: 100%; background: var(--region); transition: width .1s linear; }
+.tg-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tg-pair figure { margin: 0; display: grid; gap: 4px; justify-items: center; }
+.tg-pair canvas { width: 100%; height: auto; border: 1px solid var(--parchment-edge); border-radius: 4px; background: #fbf5e6; }
+.tg-pair figcaption { font-size: 12.5px; color: var(--ink-soft); }
+
+/* 網路圖 */
+.tg-net { width: 100%; max-height: 46vh; background: #fbf5e6; border: 1px solid var(--parchment-edge); border-radius: 4px; }
+.tg-net line { stroke: #9b8a6a; stroke-width: 2; }
+.tg-node { cursor: pointer; outline: none; }
+.tg-node circle { fill: #fff; stroke: var(--region); stroke-width: 3; transition: fill .2s; }
+.tg-node text { text-anchor: middle; font-family: var(--f-display); font-weight: 900; font-size: 15px; fill: var(--ink); pointer-events: none; }
+.tg-node:hover circle, .tg-node:focus circle { fill: #fff2cc; }
+.tg-node.ok circle { fill: #7ee39d; stroke: #23753f; }
+.tg-node.bad circle { fill: #ffb3b5; animation: tg-shake .4s; }
+@keyframes tg-shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+/* 工序排序 */
+.tg-budget { display: inline-flex; gap: 3px; vertical-align: middle; }
+.tg-budget i { width: 12px; height: 12px; border-radius: 2px; background: rgba(44,34,22,.15); }
+.tg-budget i.on { background: #c9a227; }
+.tg-seq { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.tg-seq li { display: grid; gap: 2px; }
+.tg-seq button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 12px; border-radius: 6px; border: 1px solid rgba(44,34,22,.25); background: #fbf5e6; color: var(--ink); font-size: 15px; font-weight: 600; }
+.tg-seq button span { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--region); color: #fff; font-size: 12px; flex: none; }
+.tg-seq button.picked { border-color: var(--region); box-shadow: 0 0 0 2px var(--region); }
+.tg-seq button.ok { border-color: #23753f; background: #e3f6e8; }
+.tg-seq button.bad { border-color: var(--seal); background: #fde6e5; }
+.tg-seq small { padding: 0 12px 4px 46px; font-size: 12.5px; color: var(--ink-soft); }
+
+/* 選項按鈕（提示詞、分類） */
+.tg-cats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tg-cat { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.tg-cat > b { width: 100%; font-size: 12.5px; color: var(--ink-soft); }
+.tg-cat button, .tg-devices button, .tg-bins button {
+  padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(44,34,22,.25); background: #fbf5e6; color: var(--ink); font-size: 13.5px;
+}
+.tg-cat button.on { border-color: var(--region); background: #fff; box-shadow: 0 0 0 2px var(--region); }
+.tg-cat button.ok, .tg-bins button.ok { border-color: #23753f; background: #e3f6e8; box-shadow: none; }
+.tg-cat button.bad, .tg-bins button.bad { border-color: var(--seal); background: #fde6e5; box-shadow: none; }
+
+/* 節點圖 */
+.tg-graph { position: relative; height: 330px; background: #22303f; border-radius: 6px; overflow: hidden;
+  background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 20px 20px; }
+.tg-wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tg-wires path { fill: none; stroke: #8ffcff; stroke-width: .7; vector-effect: non-scaling-stroke; stroke-width: 2.5; }
+.tg-wires path.ok { stroke: #7ee39d; }
+.tg-wires path.bad { stroke: #ff7a7f; stroke-dasharray: 4 3; }
+.tg-gnode { position: absolute; width: 16%; min-width: 92px; padding: 6px 7px; border-radius: 6px; background: #e9eef2; color: #1d2733; display: grid; gap: 3px; font-size: 11.5px; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
+.tg-gnode b { font-size: 12.5px; line-height: 1.3; }
+.tg-gnode small { color: #4b5866; line-height: 1.3; }
+.tg-port { padding: 2px 6px; border-radius: 10px; border: 1px solid #7a8a99; background: #fff; font-size: 11px; color: #1d2733; }
+.tg-port.in { justify-self: start; }
+.tg-port.out { justify-self: end; background: #d9f6ff; }
+.tg-port.on { background: #8ffcff; border-color: #1f8fa0; }
+.tg-tower { display: grid; gap: 8px; }
+.tg-tower input { width: 100%; accent-color: var(--region); }
+
+/* 教室空氣 */
+.tg-meters { display: grid; gap: 6px; }
+.tg-meters > div { display: grid; grid-template-columns: 64px 1fr 90px; align-items: center; gap: 8px; font-size: 13px; }
+.tg-meters b { text-align: right; font-variant-numeric: tabular-nums; }
+.tg-meter { position: relative; height: 12px; border-radius: 6px; background: rgba(44,34,22,.12); overflow: hidden; }
+.tg-meter i { display: block; height: 100%; width: 0; background: #46b35b; transition: width .1s linear; }
+.tg-meter.co2 i.warn { background: var(--seal); }
+.tg-meter.energy i { background: #c9a227; }
+.tg-meter em { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--seal); }
+.tg-room { width: 100%; height: auto; border-radius: 4px; }
+.tg-devices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tg-devices button { display: grid; gap: 2px; padding: 8px 6px; text-align: center; }
+.tg-devices button b { font-size: 14px; }
+.tg-devices button small { font-size: 11px; color: var(--ink-soft); }
+.tg-devices button.on { background: #fff4c8; border-color: var(--region); box-shadow: 0 0 0 2px var(--region); }
+
+/* 輸送帶 */
+.tg-belt { height: 110px; border-radius: 6px; background: repeating-linear-gradient(90deg, #5b5f69 0 18px, #4a4e57 18px 36px); display: grid; place-items: center; overflow: hidden; }
+.tg-crate { max-width: 86%; padding: 12px 18px; border-radius: 6px; background: #f6e7c8; border: 2px solid #b08a5a; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,.3); }
+.tg-crate b { font-size: 16px; line-height: 1.5; }
+.tg-crate.in { animation: tg-belt-in .5s ease-out; }
+@keyframes tg-belt-in { from { transform: translateX(-120%); } }
+.tg-bins { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.tg-bins button { display: flex; align-items: center; gap: 8px; padding: 12px; font-size: 15px; font-weight: 600; text-align: left; }
+.tg-bins button span { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--region); color: #fff; font-size: 12px; flex: none; }
+
+@media (max-width: 720px) {
+  .tg-cats { grid-template-columns: 1fr; }
+  .tg-pair { gap: 6px; }
+  .tg-devices { grid-template-columns: repeat(2, 1fr); }
+  .tg-graph.narrow { height: 430px; }
+  .tg-graph.narrow .tg-gnode { width: 44%; min-width: 0; }
+}
