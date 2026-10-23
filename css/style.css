@@ -32,6 +32,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* 避免 iOS 自動放大文字 */
 body {
   margin: 0;
   background: var(--night);
@@ -400,9 +401,12 @@ button { cursor: pointer; }
 .card-nav .lore { font-family: var(--f-lore); font-size: 13px; color: var(--ink-soft); align-self: center; text-align: center; }
 
 /* ---------- 開場 / 完成 ---------- */
-#intro { background: radial-gradient(80% 70% at 50% 45%, rgba(14,20,34,.35), rgba(6,9,16,.9)); }
-.title-card { width: min(560px, 100%); text-align: center; display: grid; gap: 18px; justify-items: center; }
-.title-card .eyebrow { font-family: var(--f-rune); font-weight: 600; font-size: 12px; letter-spacing: .5em; color: var(--brass); }
+#intro { overflow-y: auto; align-items: start; background: radial-gradient(80% 70% at 50% 45%, rgba(14,20,34,.35), rgba(6,9,16,.9)); }
+.title-card { width: min(560px, 100%); min-width: 0; text-align: center; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; justify-items: center; }
+.title-card > * { max-width: 100%; }
+#intro .title-card { margin-block: auto; } /* 置中；畫面太矮時從頂端開始、可以捲動 */
+/* 字距會加在最後一個字後面，左邊補同樣的距離才會真正置中 */
+.title-card .eyebrow { font-family: var(--f-rune); font-weight: 600; font-size: 12px; letter-spacing: .5em; padding-left: .5em; color: var(--brass); }
 .title-card h1 {
   margin: 0; font-family: var(--f-display); font-weight: 900;
   font-size: clamp(34px, 9.6vw, 80px); letter-spacing: .08em; line-height: 1.1; padding-left: .08em;
@@ -422,7 +426,7 @@ button { cursor: pointer; }
 .title-card .ctrl div { padding: 12px 14px; display: grid; gap: 4px; }
 .title-card .ctrl b { font-family: var(--f-display); font-size: 14px; color: var(--brass); }
 .title-card .ctrl span { font-size: 12.5px; color: var(--ink-light-dim); line-height: 1.6; }
-.title-card .go { font-size: 17px; padding: 13px 34px; letter-spacing: .2em; }
+.title-card .go { font-size: 17px; padding: 13px 34px 13px calc(34px + .2em); letter-spacing: .2em; }
 .title-card .fine { font-size: 11.5px; color: var(--ink-light-dim); }
 
 #complete .title-card h1 { font-size: clamp(36px, 8vw, 58px); }
@@ -489,9 +493,11 @@ button { cursor: pointer; }
   .btn svg { width: 15px; height: 15px; }
   #minimap-wrap { top: calc(var(--top) + 58px); }
   #tip { top: auto; bottom: calc(var(--bot) + 150px); }
-  .title-card .eyebrow { letter-spacing: .28em; }
-  /* 說明文字只在標點處換行，避免單字落到下一行 */
-  .title-card .lore { font-size: 15px; word-break: keep-all; }
+  .title-card .eyebrow { letter-spacing: .28em; padding-left: .28em; }
+  .title-card .lore { font-size: 14.5px; line-height: 1.8; line-break: strict; }
+  .title-card .lore br { display: none; } /* 窄螢幕讓文字自然換行 */
+  .title-card .sub { font-size: 14px; }
+  .title-card .go { font-size: 16px; padding: 12px 30px 12px calc(30px + .2em); }
 }
 
 @media (prefers-reduced-motion: reduce) {
