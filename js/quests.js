@@ -333,7 +333,8 @@ export function initQuests(api) {
         const s = st(f.id);
         const detail = s.stage === STAGE.COLLECT ? `${qOf(f).stage1.item.name} ${s.got}/${need()}` : STATUS[s.stage];
         return `<button type="button" class="quest-row" data-t="${f.id}" data-stage="${s.stage}" style="--region:${regionOf(f).color}"><i></i><b>${esc(f.name)}</b><span>${esc(detail)}</span></button>`;
-      }).join('')}</div>`;
+      }).join('')}</div>
+      <button type="button" class="reset-all" data-reset-open>重置所有進度</button>`;
   }
   logEl.addEventListener('change', (e) => {
     if (e.target.id !== 'quick-mode') return;
@@ -346,6 +347,7 @@ export function initQuests(api) {
     refreshAll();
   });
   logEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-reset-open]')) { api.openReset(); return; }
     const b = e.target.closest('.quest-row'); if (!b) return;
     const f = byId[b.dataset.t];
     if (st(f.id).stage === STAGE.COLLECT) goField(f); else api.selectTeacher(f, { fromCodex: true });

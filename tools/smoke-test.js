@@ -118,6 +118,19 @@ async function run(browser, name, opts) {
   await page.waitForTimeout(1500);
   await shot('explore');
 
+  // 重置所有進度：從「任務與徽章」分頁開啟確認視窗，取消會關閉，確定會清除進度並重新載入
+  await page.evaluate(() => { window.__quest.setMode('tour'); window.__quest.toggleCodex(true); document.querySelector('[data-tab="quests"]').click(); });
+  await page.waitForTimeout(500);
+  await page.click('[data-reset-open]');
+  const dlgOpen = await page.evaluate(() => !document.querySelector('#reset-dlg').hidden);
+  await page.click('[data-reset="cancel"]');
+  const dlgClosed = await page.evaluate(() => document.querySelector('#reset-dlg').hidden);
+  check('重置確認視窗可開關', dlgOpen && dlgClosed);
+  await page.click('[data-reset-open]');
+  await Promise.all([page.waitForNavigation({ timeout: 90000 }), page.click('[data-reset="confirm"]')]);
+  const cleared = await page.evaluate(() => ['tutIdQuest.visited.v1', 'tutIdQuest.explored.v1', 'tutIdQuest.quests.v1'].every((k) => localStorage.getItem(k) === null));
+  check('重置後進度清空', cleared);
+
   check('沒有 console 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
 }

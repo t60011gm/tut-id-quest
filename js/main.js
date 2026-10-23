@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { initQuests, QUEST_KEY } from './quests.js?v=1';
+import { initQuests, QUEST_KEY } from './quests.js?v=2';
 
 const W = window.WORLD;
 const $ = (s) => document.querySelector(s);
@@ -2447,20 +2447,34 @@ $('#btn-start').addEventListener('click', () => {
   if (target) selectTeacher(target);
   else flyTo(viewForRegion(RG.capital), () => showToast(RG.capital), 2.4);
 });
-{
-  const btn = $('#btn-reset');
-  let armed = false, timer = null;
-  btn.addEventListener('click', () => {
-    if (!armed) {
-      armed = true; btn.textContent = '確定要清除進度？再按一次';
-      clearTimeout(timer); timer = setTimeout(() => { armed = false; btn.textContent = '重新開始冒險'; }, 4000);
-      return;
-    }
-    try { localStorage.removeItem(STORE_KEY); localStorage.removeItem(EXPLORE_KEY); localStorage.removeItem(QUEST_KEY); } catch (e) { /* 忽略 */ }
-    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 忽略 */ }
-    location.reload();
-  });
+/* 重置所有進度：圖鑑底部的連結與「任務與徽章」分頁的按鈕共用，先跳出確認視窗 */
+const resetDlg = $('#reset-dlg');
+let resetBack = null;
+function openReset() {
+  resetBack = document.activeElement;
+  resetDlg.hidden = false; state.busy = true;
+  resetDlg.querySelector('[data-reset="cancel"]').focus({ preventScroll: true });
 }
+function closeReset() {
+  resetDlg.hidden = true; state.busy = false;
+  if (resetBack && resetBack.isConnected) resetBack.focus({ preventScroll: true });
+}
+function resetAll() {
+  // 音效開關是個人偏好，保留；其餘進度全部清除
+  try { [STORE_KEY, EXPLORE_KEY, QUEST_KEY].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* 忽略 */ }
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* 忽略 */ }
+  location.reload();
+}
+$('#btn-reset').addEventListener('click', openReset);
+resetDlg.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-reset]');
+  if (b) (b.dataset.reset === 'confirm' ? resetAll : closeReset)();
+  else if (e.target === resetDlg) closeReset();
+});
+resetDlg.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape') { closeReset(); e.stopPropagation(); }
+  else if (e.code === 'Tab') trapFocus(e, resetDlg.querySelector('.reset-box'));
+});
 $('#btn-mode').addEventListener('click', () => { if (!state.started) return; setMode(state.mode === 'tour' ? 'explore' : 'tour'); });
 
 refreshProgress();
@@ -2669,7 +2683,7 @@ const mergeInfo = mergeStatic();
 /* 任務系統（js/quests.js）：在合併靜態模型之後建立，小怪才不會被合併 */
 const quests = initQuests({
   scene, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
-  flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract
+  flyTo, teleport, closeCard, closeCodexIfNarrow, selectTeacher, syncInteract, openReset
 });
 
 const clock = new THREE.Clock();

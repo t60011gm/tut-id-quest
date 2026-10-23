@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=11">
+<link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
 
@@ -119,6 +119,20 @@
   </article>
 </div>
 
+<!-- 重置確認 -->
+<div id="reset-dlg" class="overlay" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" hidden>
+  <div class="reset-box plate">
+    <h3 id="reset-title">重置所有進度？</h3>
+    <p>以下紀錄會全部清除，回到剛進入大陸的狀態：</p>
+    <ul><li>已拜訪的導師</li><li>已驅散迷霧的區域</li><li>所有任務進度與徽章</li><li>快速模式設定</li></ul>
+    <p class="note">音效開關會保留。清除後無法復原。</p>
+    <div class="reset-actions">
+      <button type="button" class="btn" data-reset="cancel">取消</button>
+      <button type="button" class="btn danger" data-reset="confirm">確定重置</button>
+    </div>
+  </div>
+</div>
+
 <!-- 導師卡 -->
 <div id="card" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="card-name">
   <article class="sheet" id="card-sheet"></article>
@@ -172,6 +186,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=9"></script>
+<script type="module" src="js/main.js?v=10"></script>
 </body>
 </html>
