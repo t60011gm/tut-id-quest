@@ -193,6 +193,8 @@ button { cursor: pointer; }
   font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: auto; cursor: pointer;
 }
 .clock:hover, .clock[aria-expanded="true"] { border-color: var(--brass); }
+.clock::after { content: " ▾"; color: var(--brass); }
+.clock[aria-expanded="true"]::after { content: " ▴"; }
 /* 白天／夜晚快速切換：音效鈕左邊 */
 #btn-daynight { position: absolute; top: 6px; right: 44px; width: 32px; height: 32px; background: var(--plate-solid); color: var(--brass); }
 #btn-daynight svg { width: 18px; height: 18px; }
@@ -490,10 +492,11 @@ button { cursor: pointer; }
   .btn { padding: 8px 11px; }
   #minimap-wrap { left: auto; right: var(--gut-r); top: calc(var(--top) + 100px); bottom: auto; padding: 5px; }
   #minimap { width: 104px; height: 104px; }
-  #btn-sound { top: auto; right: auto; bottom: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%; }
+  #btn-sound { top: 2px; right: auto; bottom: auto; left: 2px; width: 28px; height: 28px; border-radius: 50%; }
   #btn-sound svg { width: 15px; height: 15px; }
-  .clock { top: auto; left: auto; right: 2px; bottom: 2px; font-size: 10.5px; padding: 2px 6px 2px 18px; }
-  #btn-daynight { top: auto; right: auto; bottom: 2px; left: 32px; width: 28px; height: 28px; border-radius: 50%; }
+  /* 手機：時鐘是小地圖下方一整條按鈕，點它打開調整時間 */
+  .clock { position: relative; top: auto; left: auto; width: 100%; font-size: 11px; padding: 4px 6px 4px 18px; text-align: center; }
+  #btn-daynight { top: 2px; right: 2px; bottom: auto; width: 28px; height: 28px; border-radius: 50%; }
   #btn-daynight svg { width: 15px; height: 15px; }
   #time-panel { left: auto; right: 0; bottom: auto; top: calc(100% + 8px); width: min(260px, calc(100vw - 32px)); }
   .clock::before { left: 5px; width: 8px; height: 8px; margin-top: -4px; }
