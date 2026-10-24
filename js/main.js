@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=6';
 import { installTrials } from './trials.js?v=3';
 import { MODERN_BUILDERS } from './world-modern.js?v=3';
-import { CYBER_BUILDERS } from './world-cyber.js?v=7';
+import { CYBER_BUILDERS } from './world-cyber.js?v=10';
 
 const W = window.WORLD;
 
