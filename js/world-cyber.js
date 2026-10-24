@@ -411,18 +411,18 @@ export const CYBER_BUILDERS = {
       for (let k = 0; k < 16; k++) { const x = (k * 37) % w, y = (k * 71) % h, len = 20 + (k * 13) % 50; const gr = c.createLinearGradient(0, y, 0, y + len); gr.addColorStop(0, 'rgba(120,255,255,0)'); gr.addColorStop(1, 'rgba(160,255,255,1)'); c.fillStyle = gr; c.fillRect(x, y, 3, len); }
     });
     const spires = [];
-    for (let k = 1, n = 0; n < 9 && k < 400; k++) {
-      const a = hash2(k, 4.4) * Math.PI * 2, d = 7 + hash2(k, 2.2) * 12, u = Math.cos(a) * d, v = Math.sin(a) * d;
-      if (!clear(u, v, 3)) continue;
-      const h = 8 + hash2(k, 1.1) * 10, y = ly(u, v);
+    for (let k = 1, n = 0; n < 3 && k < 400; k++) { // 只留三座粗壯的資料塔（細小尖塔已取消）
+      const a = hash2(k, 4.4) * Math.PI * 2, d = 10 + hash2(k, 2.2) * 9, u = Math.cos(a) * d, v = Math.sin(a) * d;
+      if (!clear(u, v, 5) || spires.some((sp) => Math.hypot(sp.u - u, sp.v - v) < 11)) continue;
+      const h = 13 + hash2(k, 1.1) * 7, y = ly(u, v);
       // 扭轉、漸細的參數化尖塔，表面流著資料光
-      const ft = fluidTower(K, h, 24, 18, paramSection({ w: 1.1, d: 0.8, taper: 0.75, bulge: 0.25, freq: 2, phase: k, twist: 3.2, sway: 0.5, swayZ: 0.3, flare: 1.2 }), 2.2);
+      const ft = fluidTower(K, h, 24, 18, paramSection({ w: 3.4, d: 2.9, taper: 0.4, bulge: 0.35, freq: 2, phase: k, twist: 2.4, sway: 0.6, swayZ: 0.3, flare: 1.2 }), 2.2);
       mesh(ft.geo, shellMat(K, '#e8eef6'), u, y, v, g);
       const st = streamTex.clone(); st.needsUpdate = true; st.repeat.set(0.2, 0.3);
       const s = noShadow(new THREE.Mesh(ft.geo, new THREE.MeshBasicMaterial({ map: st, color: n % 2 ? '#7c5cff' : '#3ef0ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
-      s.position.set(u, y, v); s.scale.set(1.04, 1, 1.04); g.add(s); spires.push(st);
-      noShadow(mesh(new THREE.OctahedronGeometry(0.6), glow(K, n % 2 ? '#c3adff' : '#3ef0ff', 2), u + ft.top.x, y + h + 0.8, v + ft.top.z, g));
-      col(u, v, 1.2); n++;
+      s.position.set(u, y, v); s.scale.set(1.04, 1, 1.04); g.add(s); spires.push({ st, u, v });
+      noShadow(mesh(new THREE.OctahedronGeometry(1), glow(K, n % 2 ? '#c3adff' : '#3ef0ff', 2), u + ft.top.x, y + h + 1.2, v + ft.top.z, g));
+      col(u, v, 3.2); n++;
     }
     // 中央神經核心：三層神經元
     const core = new THREE.Group(); core.position.set(0, 0, -2); g.add(core);
@@ -440,7 +440,7 @@ export const CYBER_BUILDERS = {
     animators.push((t, dt) => {
       if (!camNear(r)) return;
       grid.uniforms.time.value = t;
-      spires.forEach((st, i) => { st.offset.y -= dt * (0.3 + (i % 3) * 0.1); });
+      spires.forEach(({ st }, i) => { st.offset.y -= dt * (0.3 + (i % 3) * 0.1); });
       orb.rotation.y += dt * 0.4; inner.rotation.x += dt * 0.8; inner.rotation.y += dt;
       neurons.forEach((m, i) => m.scale.setScalar(1 + Math.max(0, Math.sin(t * 2.4 - i * 0.8)) * 0.6));
     });
@@ -454,16 +454,16 @@ export const CYBER_BUILDERS = {
     for (const [u, v, h] of [[-9, -6, 16], [9, -6, 13], [0, -13, 19]]) {
       const y = ly(u, v), tw = new THREE.Group(); tw.position.set(u, y, v); g.add(tw);
       // 雙曲面腰身塔：中段收細、上下外擴，外覆霓虹斜格
-      const sec = paramSection({ w: 3, d: 3, taper: 0, bulge: 0, twist: 0.8, sway: 0, swayZ: 0, flare: 1.4, waist: 0.32 });
+      const sec = paramSection({ w: 3.6, d: 3.6, taper: 0, bulge: 0, twist: 0.8, sway: 0, swayZ: 0, flare: 1.4, waist: 0.2 }); // 腰身最細處仍約 6 公尺寬
       const ft = fluidTower(K, h, 24, 28, sec, 2);
       mesh(ft.geo, shellMat(K, '#eef3f2'), 0, 0, 0, tw);
       const grid = noShadow(new THREE.LineSegments(new THREE.WireframeGeometry(fluidTower(K, h, 8, 14, sec, 2).geo), new THREE.LineBasicMaterial({ color: '#4dffb0', transparent: true, opacity: 0.55 })));
       grid.scale.set(1.03, 1, 1.03); tw.add(grid);
-      mesh(new THREE.CylinderGeometry(3.1, 3.0, 1.2, 24, 1, true), metal(K, '#8e98a8', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
+      mesh(new THREE.CylinderGeometry(3.7, 3.6, 1.2, 24, 1, true), metal(K, '#8e98a8', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
       const fan = K.dyn(new THREE.Group()); fan.position.y = h + 0.8; tw.add(fan);
-      for (let k = 0; k < 5; k++) { const b = mesh(new THREE.BoxGeometry(2.4, 0.08, 0.6), mat('#8a93ad'), 1.2, 0, 0, new THREE.Group()); const arm = b.parent; arm.rotation.y = k * Math.PI * 2 / 5; b.rotation.x = 0.4; fan.add(arm); }
+      for (let k = 0; k < 5; k++) { const b = mesh(new THREE.BoxGeometry(3, 0.08, 0.7), mat('#8a93ad'), 1.5, 0, 0, new THREE.Group()); const arm = b.parent; arm.rotation.y = k * Math.PI * 2 / 5; b.rotation.x = 0.4; fan.add(arm); }
       sparkles(tw, 40, '#9dffd0', 2.2, h + 1, h + 12, 0.5, 2.2);
-      fans.push(fan); col(u, v, 3.4);
+      fans.push(fan); col(u, v, 4);
     }
     // 生態穹頂：網格玻璃罩著一片綠地
     const dome = new THREE.Group(); dome.position.set(0, ly(0, 2), 2); g.add(dome);
@@ -554,7 +554,7 @@ export const CYBER_BUILDERS = {
     // 兩側高樓
     // 三種演算法各一棟：旋轉樓板疊層塔、瘦高 Meta-ball、橫向斷面變形展館
     tower(K, g, -13, -8, ly(-13, -8), 7, 20, 6.5, '#ff5d8f', 3); col(-13, -8, 3.8);
-    blobBuilding(K, g, 13, -8, ly(13, -8), 6.5, 17, 6, 4); col(13, -8, 3.2);
+    blobBuilding(K, g, 13, -8, ly(13, -8), 8, 17, 7.5, 4); col(13, -8, 3.8);
     aliyevBuilding(K, g, 0, -16, ly(0, -16), 20, 10, 9, 5); col(-5, -16, 4); col(0, -16, 4); col(5, -16, 4);
     // 夜市攤位
     const stalls = [['拉麵', '#ff4fd8'], ['設計', r.color], ['AR', '#3ef0ff'], ['奶茶', '#ffd23e'], ['二手', '#4dffb0'], ['社造', '#ff9a3c']];
@@ -650,7 +650,7 @@ export const CYBER_BUILDERS = {
     // 建築少一點、綠樹多一點：霓虹樹與綠色闊葉樹混種
     const towers = [], trees = [], greens = [];
     pts.forEach((pt, i) => {
-      if (pt.nearD > 34 && towers.length < (isTouch ? 36 : 60) && hash2(pt.x, pt.z) < 0.22) towers.push(pt);
+      if (pt.nearD > 34 && towers.length < (isTouch ? 36 : 60) && hash2(pt.x, pt.z) < 0.22 && !towers.some((t) => Math.hypot(t.x - pt.x, t.z - pt.z) < 13)) towers.push(pt); // 建築彼此留距離
       else if (i % 4 === 0) trees.push(pt);
       else if (i % 4 !== 3) greens.push(pt);
     });
@@ -665,9 +665,9 @@ export const CYBER_BUILDERS = {
       let h = 7 + hash2(i, 3) * 28 * sstep(150, 60, Math.hypot(pt.x, pt.z));
       const kind = h < 13 ? 'aliyev' : h < 23 ? 'blob' : 'twist';
       if (kind === 'aliyev') h *= 0.85; // 展館低平、橫向延伸
-      // 量體要夠粗壯：塔的斷面約高度的四分之一以上，Meta-ball 瘦高但不細長
-      const w = kind === 'aliyev' ? 14 + hash2(i, 1) * 7 : kind === 'blob' ? h * 0.32 + hash2(i, 1) * 2 : Math.max(6, h * 0.24) + hash2(i, 1) * 3;
-      const d = kind === 'aliyev' ? 7 + hash2(i, 2) * 3 : kind === 'blob' ? h * 0.3 + hash2(i, 2) * 2 : Math.max(5.5, h * 0.22) + hash2(i, 2) * 3;
+      // 量體要夠粗壯：最細處也要比兩棵樹冠寬（約 6 公尺以上），塔的斷面約高度的四分之一以上
+      const w = kind === 'aliyev' ? 14 + hash2(i, 1) * 7 : kind === 'blob' ? Math.max(7, h * 0.38) + hash2(i, 1) * 2 : Math.max(7.5, h * 0.26) + hash2(i, 1) * 3;
+      const d = kind === 'aliyev' ? 7 + hash2(i, 2) * 3 : kind === 'blob' ? Math.max(6.5, h * 0.36) + hash2(i, 2) * 2 : Math.max(7, h * 0.24) + hash2(i, 2) * 3;
       return { pt, i, w, d, h, kind, rot: hash2(i, 4) * 6.28 };
     });
     // 中低層：橫向斷面變形展館，四個原型
@@ -700,7 +700,7 @@ export const CYBER_BUILDERS = {
     const BUCKET = [28, 36], bucketOf = (h) => (h <= 30 ? 0 : 1);
     const VARIANT = [
       { taper: 0.2, bulge: 0.3, freq: 1.4, phase: 0.3, twist: 1.8, sway: 0.9, swayZ: 0.4, flare: 0.4 },
-      { taper: 0.35, bulge: 0.4, freq: 2.2, phase: 2.1, twist: -1.4, sway: 0.4, swayZ: 0.6, flare: 0.5, waist: 0.1 }
+      { taper: 0.25, bulge: 0.4, freq: 2.2, phase: 2.1, twist: -1.4, sway: 0.4, swayZ: 0.6, flare: 0.5, waist: 0.06 }
     ];
     BUCKET.forEach((bh, bi) => VARIANT.forEach((vr, vi) => {
       const list = specs.filter((sp) => sp.kind === 'twist' && bucketOf(sp.h) === bi && sp.i % 2 === vi);
