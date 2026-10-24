@@ -32,8 +32,8 @@
  *     look     3D 人物外觀，參考老師照片：
  *                hair     short｜swept｜shoulder｜bob｜long｜wavy　hairColor 髮色
  *                glasses  round｜square｜sun（墨鏡）　hat beanie｜flatcap　hatColor
- *                top      shirt｜polo｜blazer｜sweater｜mandarin｜sleeveless　topColor　inner 外套內搭色
- *                sleeves  long｜short　pants 褲子色　earrings 耳環
+ *                top      shirt｜polo｜blazer｜sweater｜mandarin｜vneck｜sleeveless　topColor　inner 外套內搭色
+ *                sleeves  long｜short　pants 褲子色　shoes 鞋子色（省略為深色）　earrings 耳環
  *                prop     招牌道具（對應 main.js 的 PROPS）
  * ========================================================================= */
 
@@ -165,7 +165,7 @@ window.WORLD = {
       feats: ["國立成功大學建築研究所 博士班（2023～）", "HJPLUS 加號設計數位工程有限公司 負責人", "曾任黃聖吉建築師事務所 建築資訊主任", "McNeel Rhinoceros 3D 原廠授權講師"],
       url: "https://arch.mcu.edu.tw/%e5%be%90%e7%81%9d-%e6%95%b8%e4%bd%8d%e5%85%bc%e4%bb%bb%e8%ac%9b%e5%b8%ab/",
       lines: ["節點接上節點，參數就會開始說話。", "把 AI 接進設計流程，從建模到出圖都能更聰明。", "設計運算不是炫技，是讓重複的事交給電腦。"],
-      look: { hair: "short", hairColor: "#24201d", top: "shirt", topColor: "#3c5a73", sleeves: "long", pants: "#2b2d33", prop: "nodes" }
+      look: { hair: "swept", hairColor: "#16110f", glasses: "square", top: "blazer", topColor: "#1f2024", inner: "#7d7f85", sleeves: "long", pants: "#26272c", prop: "nodes" }
     },
     {
       id: "chen-nien-tsu",
@@ -289,7 +289,7 @@ window.WORLD = {
       cls: "風格美學師",
       fields: ["室內美學與風格"],
       lines: ["風格不是複製，而是找到屬於空間的個性。", "光線、材質、色彩配對了，美感自然就出來。", "先決定想要的感覺，再挑家具和布料。"],
-      look: { hair: "bob", hairColor: "#3a2a22", top: "blazer", topColor: "#b07a8c", inner: "#f4ece4", sleeves: "long", pants: "#3a3440", prop: "moodboard" }
+      look: { hair: "bob", hairColor: "#2e1f18", top: "vneck", topColor: "#3b414d", sleeves: "short", pants: "#3b414d", shoes: "#b9bdc3", prop: "moodboard" }
     }
   ]
 };

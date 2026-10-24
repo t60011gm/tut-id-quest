@@ -94,6 +94,60 @@ function holoScreen(K, g, w, h, x, y, z, rotY, draw, fps = 8) {
   let last = -1;
   return { mesh: m, update: (time) => { const f = Math.floor(time * fps); if (f === last) return; last = f; draw(cx, cv.width, cv.height, time); t.needsUpdate = true; } };
 }
+/* Zaha Hadid 風格的參數化流動高樓：圓角斷面（超橢圓）一層層往上，尺寸起伏、逐層扭轉、
+ * 整體 S 形擺動，底部平滑外擴融入地面；回傳外殼幾何與每一圈的頂點（給屋頂與霓虹輪廓線用） */
+function fluidSection(k) {
+  const flare = (1 - k) ** 7 * 3.2; // 底部外擴
+  return {
+    a: 4.8 * (1 - k * 0.3) + Math.sin(k * Math.PI * 1.6) * 1.4 + flare,
+    b: 3.3 * (1 - k * 0.25) + Math.sin(k * Math.PI * 1.6 + 0.9) * 1.0 + flare * 0.8,
+    twist: k * 2.3,
+    dx: Math.sin(k * Math.PI * 1.25) * 3.2,
+    dz: -Math.sin(k * Math.PI * 0.85) * 1.6
+  };
+}
+function fluidTower(K, H = 38, RINGS = 56, SEG = 56) {
+  const { THREE } = K;
+  const pos = [], uv = [], idx = [], rings = [];
+  const n = 2.5; // 超橢圓指數：越大越方，2 是橢圓
+  for (let i = 0; i <= RINGS; i++) {
+    const k = i / RINGS, y = k * H, sc = fluidSection(k), ring = [];
+    const ct = Math.cos(sc.twist), st = Math.sin(sc.twist);
+    for (let j = 0; j <= SEG; j++) {
+      const th = j / SEG * Math.PI * 2, c = Math.cos(th), s = Math.sin(th);
+      const x0 = Math.sign(c) * Math.abs(c) ** (2 / n) * sc.a, z0 = Math.sign(s) * Math.abs(s) ** (2 / n) * sc.b;
+      const x = x0 * ct - z0 * st + sc.dx, z = x0 * st + z0 * ct + sc.dz;
+      pos.push(x, y, z); uv.push(j / SEG * 14, y / 2.6);
+      if (j < SEG) ring.push(new THREE.Vector3(x, y, z));
+    }
+    rings.push(ring);
+  }
+  for (let i = 0; i < RINGS; i++) for (let j = 0; j < SEG; j++) {
+    const a = i * (SEG + 1) + j, b = a + SEG + 1;
+    idx.push(a, b, a + 1, b, b + 1, a + 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  // 屋頂：最上一圈的扇形面
+  const top = rings[RINGS], c = top.reduce((v, p) => v.add(p), new THREE.Vector3()).divideScalar(top.length);
+  const cap = new THREE.BufferGeometry().setFromPoints([c, ...top]);
+  const ci = []; for (let j = 0; j < top.length; j++) ci.push(0, 1 + ((j + 1) % top.length), 1 + j);
+  cap.setIndex(ci); cap.computeVertexNormals();
+  return { geo, cap, rings, top: c };
+}
+/* 流線外殼：白色平滑板帶＋深色水平帶窗；發光貼圖只有窗帶 */
+const ribbonTex = (K) => ctex(K, 'ribbon', 64, 64, (c, w, h) => {
+  const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#ffffff'); g.addColorStop(0.76, '#e6ebf0'); g.addColorStop(0.77, '#5a7494'); g.addColorStop(1, '#3a5070');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.fillStyle = 'rgba(255,255,255,.4)'; c.fillRect(0, 50, w, 1);
+  c.fillStyle = 'rgba(200,215,230,.45)'; for (let x = 0; x < w; x += 8) c.fillRect(x, 49, 1, h - 49);
+});
+const ribbonLitTex = (K) => ctex(K, 'ribbonlit', 64, 64, (c, w, h) => {
+  c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x += 8) { c.fillStyle = (x / 8) % 3 ? '#cfefff' : '#ffd6f4'; c.fillRect(x + 1, 51, 6, h - 53); }
+});
 /* 地面霓虹格線（中心向外的脈衝） */
 function neonGrid(K, ctx, size, c1, cell = 2) {
   const mat = K.groundFX({ time: { value: 0 }, col: { value: new K.THREE.Color(c1) } },
@@ -116,46 +170,58 @@ export const CYBER_BUILDERS = {
     const { THREE, mesh, mat, animators, camNear, hash2, sparkles } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 44, '#ff4fd8');
-    mesh(new THREE.CylinderGeometry(15.5, 16.5, 0.8, 8), metal(K), 0, 0.2, 0, g);
-    // 巨塔：三段退縮
-    tower(K, g, 0, -3, 0, 10, 12, 10, '#ff4fd8', 3.4);
-    tower(K, g, 0, -3, 12.3, 7.5, 10, 7.5, '#3ef0ff', 3.4);
-    tower(K, g, 0, -3, 22.6, 5, 7, 5, '#ffd23e', 3.4);
-    mesh(new THREE.CylinderGeometry(0.12, 0.3, 6, 6), mat('#9aa0b8'), 0, 32.6, -3, g);
-    col(0, -3, 7.2);
-    // 全像環
-    const rings = [[9, 8, '#3ef0ff'], [7.5, 15, '#ff4fd8'], [5.6, 24, '#ffd23e']].map(([rad, y, c]) => {
-      const m = noShadow(new THREE.Mesh(new THREE.TorusGeometry(rad, 0.14, 6, 64), new THREE.MeshBasicMaterial({ color: c, toneMapped: false })));
-      m.position.set(0, y, -3); m.rotation.x = Math.PI / 2; g.add(m); return m;
+    mesh(new THREE.CylinderGeometry(16, 16.6, 0.5, 40), concrete(K, '#c9c9c6'), 0, 0.05, 0, g);
+    // 參數化流動高樓（Zaha Hadid 風格）：白色流線外殼、水平帶窗、逐層扭轉的 S 形量體
+    const H = 38, ft = fluidTower(K, H);
+    const shellM = mat('#ffffff', { map: ribbonTex(K), emissiveMap: ribbonLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.1 });
+    shellM.userData.day = 0.06; shellM.userData.night = 1.25;
+    const tower = new THREE.Group(); tower.position.set(0, 0, -3); g.add(tower);
+    mesh(ft.geo, shellM, 0, 0, 0, tower);
+    mesh(ft.cap, mat('#eef1f4'), 0, 0, 0, tower);
+    col(0, -3, 7);
+    // 霓虹輪廓線：沿著幾圈樓板勾出曲面，夜裡最明顯
+    const contours = [10, 20, 30, 40, 48].map((ri, i) => {
+      const pts = ft.rings[ri].map((p) => p.clone().multiplyScalar(1.004));
+      const line = noShadow(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: NEON[i % 3], transparent: true, opacity: 0.85 })));
+      tower.add(line); return line;
     });
+    // 流線雨遮：從塔身前方流向廣場、再落回地面的曲面
+    (() => {
+      const S = 40, W = 8, pos = [], idx = [];
+      for (let i = 0; i <= S; i++) {
+        const k = i / S, v = -0.5 + k * 11, y = 7.5 * (1 - k) ** 1.6 + Math.sin(k * Math.PI) * 2.2, u0 = Math.sin(k * Math.PI * 1.3) * 1.6, w = W * (1 - k * 0.45);
+        for (const side of [-1, 1]) pos.push(u0 + side * w / 2, Math.max(0.1, y + side * 0.6 * Math.sin(k * Math.PI)), v);
+      }
+      for (let i = 0; i < S; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+      return mesh(geo, mat('#f6f8fa', { side: THREE.DoubleSide }), 0, 0, 0, g);
+    })();
     // 塔頂關係網路球（社會網路分析）
-    const net = new THREE.Group(); net.position.set(0, 37, -3); g.add(net);
+    const net = new THREE.Group(); net.position.set(ft.top.x, H + 5, ft.top.z - 3); g.add(net);
     const np = Array.from({ length: 16 }, (_, i) => { const a = i * 2.4, y = (hash2(i, 2) - 0.5) * 5, rad = 2 + hash2(i, 3) * 2.2; return new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad); });
     const nodeM = np.map((p) => noShadow(mesh(new THREE.IcosahedronGeometry(0.32, 0), glow(K, '#ffd23e', 2), p.x, p.y, p.z, net)));
     net.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(np.flatMap((a, i) => np.filter((b, j) => j > i && a.distanceTo(b) < 3.4).flatMap((b) => [a, b]))), new THREE.LineBasicMaterial({ color: '#ff9ae8', transparent: true, opacity: 0.8 })));
     // 光柱
     const beam = noShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.2, 120, 16, 1, true), holoMat(K, '#3ef0ff', 0.18)));
-    beam.position.set(0, 90, -3); g.add(beam);
-    // 前方的全像看板：新使用者歡迎畫面
-    const sign = holoScreen(K, g, 7, 3, 0, 7.5, 6, 0, (c, w, h, time) => {
+    beam.position.set(ft.top.x, H + 60, ft.top.z - 3); g.add(beam);
+    // 漂浮的全像看板：新使用者歡迎畫面
+    const sign = holoScreen(K, g, 7, 3, 0, 13, 7, 0, (c, w, h, time) => {
       c.clearRect(0, 0, w, h); c.fillStyle = 'rgba(30,10,60,0.55)'; c.fillRect(0, 0, w, h);
       c.strokeStyle = '#ff4fd8'; c.lineWidth = 3; c.strokeRect(3, 3, w - 6, h - 6);
       c.fillStyle = '#3ef0ff'; c.font = '900 30px sans-serif'; c.textAlign = 'center'; c.fillText('DESIGN NEXUS', w / 2, h * 0.42);
       c.fillStyle = '#ffffff'; c.font = '700 18px sans-serif'; c.fillText(`ONLINE · ${String(Math.floor(time * 7) % 1000).padStart(3, '0')} NODES`, w / 2, h * 0.72);
     });
-    for (const sx of [-3.6, 3.6]) mesh(new THREE.BoxGeometry(0.2, 9, 0.2), metal(K), sx, 4.5, 6, g);
-    col(-3.6, 6, 0.4); col(3.6, 6, 0.4);
     // 環狀廣場的霓虹柱
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + 0.3, u = Math.cos(a) * 15.5, v = Math.sin(a) * 15.5; if (v > 8 && Math.abs(u) < 7) continue; neonPylon(K, g, u, v, ly(u, v), NEON[k % 3]); col(u, v, 0.4); }
     sparkles(g, 120, '#ff9ae8', 16, 1, 30, 0.4, 1.5);
     animators.push((t, dt) => {
       if (!camNear(r, 240)) return;
       grid.uniforms.time.value = t;
-      rings.forEach((m, i) => { m.rotation.z += dt * (0.3 + i * 0.2) * (i % 2 ? -1 : 1); m.position.y = [8, 15, 24][i] + Math.sin(t + i) * 0.4; });
+      contours.forEach((l, i) => { l.material.opacity = 0.45 + Math.max(0, Math.sin(t * 1.6 - i * 0.9)) * 0.55; });
       net.rotation.y += dt * 0.25;
       nodeM.forEach((m, i) => m.scale.setScalar(1 + Math.max(0, Math.sin(t * 2 - i * 0.7)) * 0.7));
       beam.material.opacity = 0.14 + Math.sin(t * 3) * 0.05;
-      sign.update(t); sign.mesh.material.opacity = Math.random() < 0.03 ? 0.4 : 0.92;
+      sign.update(t); sign.mesh.position.y = 13 + Math.sin(t * 0.8) * 0.3; sign.mesh.material.opacity = Math.random() < 0.03 ? 0.4 : 0.92;
     });
   },
 

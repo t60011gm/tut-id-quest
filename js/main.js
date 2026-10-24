@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=6';
 import { installTrials } from './trials.js?v=3';
 import { MODERN_BUILDERS } from './world-modern.js?v=3';
-import { CYBER_BUILDERS } from './world-cyber.js?v=3';
+import { CYBER_BUILDERS } from './world-cyber.js?v=5';
 
 const W = window.WORLD;
 
@@ -90,11 +90,12 @@ const ENV = {
   cyber: {
     // 白天是帶紫的霧霾晴天，夜裡（見 DN）才是深色霓虹夜景
     sky: ['#3e6fb8', '#a48cc8', '#1d3a66'], water: '#1b3f66', hemi: ['#c9c2ff', '#2a2f48', 1.45], sun: 2.1, exposure: 1.1,
-    terrain: { grass: '#4b5372', sand: '#4a4d66', wet: '#2c3048', rock: '#5a5e78', path: '#262a3e', pink: '#6a4a86' },
+    // 區域核心與道路是混凝土，區域之間保留草地（未來都市的綠帶）
+    terrain: { grass: '#5f9c66', sand: '#9a978e', wet: '#5a6070', rock: '#7a7e8c', path: '#2e3244', pink: '#7e6a9a' },
     style: {
-      capital: { ground: '#5a5480', foliage: '#ff4fd8' }, forest: { ground: '#3a5a7e', foliage: '#3ee6ff' },
-      valley: { ground: '#3e6a62', foliage: '#4dffb0' }, workshop: { ground: '#6a5446', foliage: '#ff9a3c' },
-      market: { ground: '#6a446a', foliage: '#ff5d8f' }, plateau: { ground: '#5e4884', foliage: '#c77dff' }
+      capital: { ground: '#9a98a4', foliage: '#ff4fd8' }, forest: { ground: '#8a96a4', foliage: '#3ee6ff' },
+      valley: { ground: '#86a094', foliage: '#4dffb0' }, workshop: { ground: '#a0968c', foliage: '#ff9a3c' },
+      market: { ground: '#a08ea4', foliage: '#ff5d8f' }, plateau: { ground: '#9a90ae', foliage: '#c77dff' }
     },
     mood: {
       capital: { fog: '#b9a6d8', hemi: '#d6ccff', sun: '#fff0f6' }, forest: { fog: '#a6c4e0', hemi: '#c6ecff', sun: '#eaf8ff' },
@@ -1562,6 +1563,8 @@ function buildTop(lk, g, r) {
     if (lk.top === 'shirt') for (let k = 0; k < 3; k++) mesh(new THREE.SphereGeometry(0.035, 6, 4), mat('#d8d4cc'), 0, 1.95 - k * 0.3, 0.56 + k * 0.012, g).castShadow = false;
   } else if (lk.top === 'mandarin') {
     mesh(new THREE.CylinderGeometry(0.27, 0.29, 0.14, 12, 1, true), top, 0, 2.18, 0, g);
+  } else if (lk.top === 'vneck') { // V 領：領口露出膚色三角
+    for (const sx of [-1, 1]) { const v = mesh(new THREE.BoxGeometry(0.09, 0.42, 0.04), mat(SKIN), sx * 0.09, 2.0, 0.5, g); v.rotation.z = sx * 0.4; v.castShadow = false; }
   } else if (lk.top === 'sweater') {
     const c = mesh(new THREE.TorusGeometry(0.28, 0.08, 6, 14), top, 0, 2.16, 0, g); c.rotation.x = Math.PI / 2;
   }
@@ -1770,7 +1773,7 @@ function buildNPC(f) {
   // 腿與鞋
   for (const sx of [-1, 1]) {
     mesh(new THREE.CylinderGeometry(0.19, 0.17, 0.9, 8), mat(lk.pants || '#2b2d33'), sx * 0.22, 0.5, 0, g);
-    mesh(new THREE.BoxGeometry(0.28, 0.14, 0.44), dark, sx * 0.22, 0.07, 0.07, g);
+    mesh(new THREE.BoxGeometry(0.28, 0.14, 0.44), lk.shoes ? mat(lk.shoes) : dark, sx * 0.22, 0.07, 0.07, g);
   }
   const torso = buildTop(lk, g, r);
   mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.22, 8), skin, 0, 2.18, 0, g);
@@ -2517,7 +2520,7 @@ const mmBase = document.createElement('canvas'); mmBase.width = mmBase.height = 
   const MMC = { // 小地圖配色跟著世界觀
     fantasy: ['#6f9f50', '#25607a', '#3d8aa6', '#e2cc92', '#e3cf98'],
     modern: ['#76b354', '#2a6f95', '#4596bd', '#d9cfb0', '#8a8f98'],
-    cyber: ['#2a2f48', '#081428', '#10284a', '#2e3150', '#3ef0ff']
+    cyber: ['#4f8a5a', '#081428', '#10284a', '#8a8880', '#3ef0ff']
   }[WORLD_ID].map((h) => new THREE.Color(h));
   const [grass, sea, shallow, sand, path] = MMC;
   for (let py = 0; py < MM; py += step) for (let px = 0; px < MM; px += step) {
