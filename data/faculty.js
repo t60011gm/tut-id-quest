@@ -6,8 +6,10 @@
  * 其他資料來源（2026-10 擷取）：
  *   專任師資頁 https://id.tut.edu.tw/p/403-1067-1265.php?Lang=zh-tw
  *   兼任師資頁 https://id.tut.edu.tw/p/403-1067-1716.php?Lang=zh-tw
- *   徐灝：系網無資料，學經歷取自銘傳大學建築系師資頁等公開資料
- *   吳宛蓉：系網無資料、網路查無可靠來源，目前只列研究領域
+ *   兼任教師：另依系上提供的「114-2 擬新聘兼任教師名冊」「115-1 擬續聘兼任教師名冊」（2026-10）補充
+ *             職稱、授課、學歷與經歷；名冊中的出生年月與證書字號屬個人資料，不放上網站
+ *   徐灝：另參考銘傳大學建築系師資頁等公開資料
+ *   吳宛蓉：照片由系上提供（2026-10）
  *
  * 欄位說明
  *   regions[]  奇幻大陸上的區域（研究領域）
@@ -156,13 +158,14 @@ window.WORLD = {
     {
       id: "hsu-hao",
       name: "徐灝",
-      title: "兼任教師",
+      title: "兼任助理教授級專業技術人員",
       adjunct: true,
       region: "forest",
       cls: "AI 整合術士",
-      edu: "國立成功大學建築研究所 碩士（設計、運算與數位製造組）",
+      edu: "國立成功大學建築學系碩士班 碩士",
       fields: ["設計運算", "AI 整合研究"],
-      feats: ["國立成功大學建築研究所 博士班（2023～）", "HJPLUS 加號設計數位工程有限公司 負責人", "曾任黃聖吉建築師事務所 建築資訊主任", "McNeel Rhinoceros 3D 原廠授權講師"],
+      courses: ["設計運算與 AI 整合應用"],
+      feats: ["加號設計數位工程有限公司（HJPLUS）負責人（112.11～迄今）", "國立成功大學建築研究所 博士班（2023～）", "曾任高仲廷建築師事務所 3D & BIM 專員、薩摩亞商澤新建築顧問 助理建築師", "第五屆海峽建築新人獎 銀獎（2014）", "天華竹構建造大賽 優秀獎（2018）", "Autodesk Revit Certified Professional（2017）", "McNeel Rhinoceros 3D 原廠國際認證暨授權講師（2015）"],
       url: "https://arch.mcu.edu.tw/%e5%be%90%e7%81%9d-%e6%95%b8%e4%bd%8d%e5%85%bc%e4%bb%bb%e8%ac%9b%e5%b8%ab/",
       lines: ["節點接上節點，參數就會開始說話。", "把 AI 接進設計流程，從建模到出圖都能更聰明。", "設計運算不是炫技，是讓重複的事交給電腦。"],
       look: { hair: "swept", hairColor: "#16110f", glasses: "square", top: "blazer", topColor: "#1f2024", inner: "#7d7f85", sleeves: "long", pants: "#26272c", prop: "nodes" }
@@ -224,7 +227,7 @@ window.WORLD = {
       cls: "構築大匠",
       edu: "國立成功大學建築學系碩士班 碩士",
       fields: ["實構築", "木構造"],
-      courses: ["室內設計整合 BIM 特論"],
+      courses: ["實構築：竹木構造特論", "室內設計整合 BIM 特論"],
       feats: ["原型結構工程顧問有限公司 負責人（101.01～迄今）", "曾任日本構造設計集團 SDG 設計師", "上海世博會中國船舶館 結構負責人（2009）", "日本岡山縣觀光之塔 首獎（2006）", "2015 臺灣建築獎－雲林農博公園"],
       url: "https://id.tut.edu.tw/p/406-1067-51025,r1716.php?Lang=zh-tw",
       photo: "img/faculty/chen-kuan-fan.jpg",
@@ -257,7 +260,7 @@ window.WORLD = {
       edu: "台南應用科技大學 學士",
       fields: ["商業空間特論", "設計公司經營管理"],
       courses: ["商業空間規劃與設計"],
-      feats: ["深圳市白日夢創意設計事務所 設計總監（111.01～迄今）", "曾任梁志天設計有限公司 室內設計師", "2023 美國 TITAN Property Awards 室內設計金獎", "2022 法國 NOVUM DESIGN AWARD 金獎", "建築物室內設計乙級技術士"],
+      feats: ["深圳市白日夢創意設計事務所 設計總監（111.01～迄今）", "曾任梁志天設計有限公司、瓦第設計工程有限公司 室內設計師", "2023 美國 TITAN Property Awards 室內設計金獎", "2022 法國 NOVUM DESIGN AWARD 金獎", "2020 英國 International Hotel & Property Awards 亞太區公共區域大獎", "建築物室內設計乙級技術士"],
       email: "t60115@mail.tut.edu.tw",
       url: "https://id.tut.edu.tw/p/406-1067-46038,r1716.php?Lang=zh-tw",
       photo: "img/faculty/hsu-lu-li.jpg",
@@ -283,12 +286,16 @@ window.WORLD = {
     {
       id: "wu-wan-jung",
       name: "吳宛蓉",
-      title: "兼任教師",
+      title: "兼任講師",
       adjunct: true,
       region: "plateau",
       cls: "風格美學師",
+      edu: "英國威爾斯大學（University of Wales）室內與生活設計 碩士、義大利 Domus Academy 室內與生活設計 碩士",
       fields: ["室內美學與風格"],
+      courses: ["室內陳設與風格"],
+      feats: ["暮空間室內設計工程有限公司 設計師（109.05～迄今）", "mmm 傢俱藝術研究 Blog 設計師（107.08～迄今）", "曾主持吳宛蓉室內生活設計工作室（105.01～109.07）", "曾任吳建森建築師事務所、禾築設計、清禾設計、傑西艾倫設計 設計師"],
       lines: ["風格不是複製，而是找到屬於空間的個性。", "光線、材質、色彩配對了，美感自然就出來。", "先決定想要的感覺，再挑家具和布料。"],
+      photo: "img/faculty/wu-wan-jung.jpg",
       look: { hair: "bob", hairColor: "#2e1f18", top: "vneck", topColor: "#3b414d", sleeves: "short", pants: "#3b414d", shoes: "#b9bdc3", prop: "moodboard" }
     }
   ]

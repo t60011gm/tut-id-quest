@@ -21,7 +21,7 @@
 - 每個區域地標在 `regionCtx(r)` 的區域座標系中建構：local +z 永遠指向王都（訪客來的方向），NPC 站在 local v≈12 處面向訪客。
 - `colliders` 陣列是探險模式的碰撞圓；`animators` 陣列是每幀更新函式。
 - NPC：`buildNPC(f)` 依 `f.look` 組出 Q 版人物（`buildHair`／`buildHatLook`／`buildGlasses`／`buildTop`／`buildArm`），招牌道具在 `PROPS`（每個回傳每幀更新函式）。`updateNPCs()` 處理轉身、揮手、底部對話框 `#dialog`（輪播 `f.lines`）與拜訪特效；`updateMood()` 依鏡頭焦點把霧色與天光換成 `MOOD` 中的區域色調。
-- 人物外觀參考老師照片。徐灝、吳宛蓉兩位老師的 3D 外觀已依使用者提供的照片調整，但導師卡用的照片檔（`img/faculty/hsu-hao.jpg`、`img/faculty/wu-wan-jung.jpg`）還沒有放進專案。
+- 人物外觀參考老師照片。徐灝、吳宛蓉兩位老師的 3D 外觀已依使用者提供的照片調整，吳宛蓉老師的照片檔已放入，徐灝老師的照片檔（`img/faculty/hsu-hao.jpg`）還沒有。
 - 地標特效共用工具（在 `buildCapital` 前）：`canvasTex()` 用 canvas 畫貼圖、`drapedPlane()` 貼地形的平面配 `groundFX()` 著色器做地面特效、`playerLocal()` 取玩家在區域座標的位置。重的特效動畫開頭用 `camNear(r)` 判斷，鏡頭遠離該區就暫停。
 - 材質：`mat(color, opts)` 產生快取的卡通材質（`TOON`，四階 `toonRamp`，會忽略 metalness／roughness）；`texMat('stone'|'tile'|'wood', color, repeat)` 是加上程式貼圖（`PATTERNS`）的版本。
 - 效能：主迴圈前的 `mergeStatic()` 會把所有 animators 在幾個時間點跑一次，找出會動的物件，其餘靜態模型依「區域（或 NPC）＋材質」合併；整島視角約 700 次 draw call。**會動但不在 animators 裡、或動得很少的物件要用 `dyn(obj)` 標記**（例如 NPC 手臂、品牌牆標誌），否則會被合併而動不了。霧團是 `InstancedMesh`。新增模型時手機（`isTouch`）要減少粒子與數量。
