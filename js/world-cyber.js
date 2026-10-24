@@ -92,6 +92,8 @@ function tower(K, g, u, v, y, w, h, d, c, seed = 1) {
   const ft = fluidTower(K, h, 28, 32, sec, 2.4);
   const t = new THREE.Group(); t.position.set(u, y, v); g.add(t);
   mesh(ft.geo, shellMat(K), 0, 0, 0, t);
+  const tr = terraceGeo(K, ft, [0.3, 0.55, 0.8]);
+  mesh(tr.geo, K.mat('#eef1f4'), 0, 0, 0, t); plantShrubs(K, t, tr.plants, 0.5);
   noShadow(mesh(ft.cap, glow(K, c, 1.4), 0, 0, 0, t));
   t.add(noShadow(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(ft.rings[ft.rings.length - 1].map((p) => p.clone().multiplyScalar(1.01))), new THREE.LineBasicMaterial({ color: c }))));
   return ft;
@@ -152,13 +154,19 @@ const plateSpec = (K, w, h, d, seed) => {
   const n = Math.max(4, Math.floor(h / 1.25)), rot = 0.09 + K.hash2(seed, 1) * 0.1, ph = K.hash2(seed, 2) * 6;
   return Array.from({ length: n }, (_, i) => ({ y: 0.5 + i * 1.25, a: w / 2 * (0.8 + 0.2 * Math.sin(i * 0.45 + ph)), b: d / 2 * (0.62 + 0.18 * Math.sin(i * 0.38 + ph + 1)), r: i * rot }));
 };
+/* 樓板露台外緣的植栽點（塔的區域座標）：隔層種一圈 */
+const plateRim = (K, plates, seed) => plates.flatMap((pl, i) => i % 2 || i === plates.length - 1 ? [] : Array.from({ length: 7 }, (_, k) => {
+  const a = k / 7 * Math.PI * 2 + K.hash2(seed, i) * 0.6, x = Math.cos(a) * pl.a * 0.86, z = Math.sin(a) * pl.b * 0.86;
+  return new K.THREE.Vector3(x * Math.cos(pl.r) + z * Math.sin(pl.r), pl.y + 0.15, -x * Math.sin(pl.r) + z * Math.cos(pl.r));
+}));
 function plateTower(K, g, u, v, y, w, h, d, c, seed) {
   const { THREE, mesh } = K;
   const t = new THREE.Group(); t.position.set(u, y, v); g.add(t);
   const plates = plateSpec(K, w, h, d, seed);
   plates.forEach((pl, i) => { const m = mesh(plateGeo(K), K.mat(i === plates.length - 1 ? c : '#f2f4f7', i === plates.length - 1 ? { emissive: c, emissiveIntensity: 1.2 } : {}), 0, pl.y, 0, t); m.scale.set(pl.a, 1, pl.b); m.rotation.y = pl.r; });
-  const cr = Math.min(w, d) * 0.22;
+  const cr = Math.min(w, d) * 0.3;
   mesh(new THREE.CylinderGeometry(cr, cr, h, 16), coreMat(K), 0, h / 2, 0, t);
+  plantShrubs(K, t, plateRim(K, plates, seed), 0.45); // 每層樓板外緣都是露台花台
   return t;
 }
 /* 波浪屋頂：兩端流向地面的連續曲面（工廠、展館用） */
@@ -235,6 +243,45 @@ function fluidTower(K, H = 38, RINGS = 56, SEG = 56, section = fluidSection, n =
   cap.setIndex(ci); cap.computeVertexNormals();
   return { geo, cap, rings, top: c };
 }
+/* 露台：在流線塔的幾圈樓層外推一圈樓板（上下兩面＋外緣），回傳樓板幾何與植栽位置（塔的區域座標）。
+ * levels 是 0～1 的高度比例；out 是外推比例 */
+function terraceGeo(K, ft, levels, out = 1.22, th = 0.35) {
+  const { THREE } = K;
+  const pos = [], idx = [], plants = [];
+  levels.forEach((lv) => {
+    const ring = ft.rings[Math.round(lv * (ft.rings.length - 1))], n = ring.length;
+    const c = ring.reduce((v, p) => v.add(p), new THREE.Vector3()).divideScalar(n);
+    const base = pos.length / 3;
+    ring.forEach((p) => {
+      const ox = c.x + (p.x - c.x) * out, oz = c.z + (p.z - c.z) * out;
+      pos.push(p.x, p.y + 0.02, p.z, ox, p.y + 0.02, oz, ox, p.y - th, oz, p.x, p.y - th, p.z);
+    });
+    for (let j = 0; j < n; j++) {
+      const a = base + j * 4, b = base + ((j + 1) % n) * 4;
+      idx.push(a, b, a + 1, b, b + 1, a + 1); // 上面
+      idx.push(a + 1, b + 1, a + 2, b + 1, b + 2, a + 2); // 外緣
+      idx.push(a + 2, b + 2, a + 3, b + 2, b + 3, a + 3); // 底面
+    }
+    ring.forEach((p, j) => { if (j % 3 === 0) { const k = (1 + out) / 2 + 0.02; plants.push(new THREE.Vector3(c.x + (p.x - c.x) * k, p.y + 0.02, c.z + (p.z - c.z) * k)); } });
+  });
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  return { geo, plants };
+}
+/* 露台植栽：一叢叢綠色灌木（實例化），位置是世界座標 */
+const PLANT_C = ['#4f9a4a', '#5fae52', '#3f8a4c', '#6cbf5a'];
+function plantShrubs(K, parent, list, size = 0.55) {
+  const { THREE, hash2 } = K;
+  if (!list.length) return null;
+  const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), K.mat('#ffffff'), list.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), col = new THREE.Color();
+  list.forEach((p, i) => {
+    const sc = size * (0.7 + hash2(i, p.x) * 0.6);
+    m4.compose(new THREE.Vector3(p.x, p.y + sc * 0.6, p.z), q, s.set(sc, sc * 0.85, sc)); im.setMatrixAt(i, m4);
+    im.setColorAt(i, col.set(PLANT_C[i % PLANT_C.length]));
+  });
+  im.castShadow = true; parent.add(im);
+  return im;
+}
 /* 流線外殼：白色平滑板帶＋深色水平帶窗；發光貼圖只有窗帶 */
 const ribbonTex = (K) => ctex(K, 'ribbon', 64, 64, (c, w, h) => {
   const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#ffffff'); g.addColorStop(0.76, '#e6ebf0'); g.addColorStop(0.77, '#5a7494'); g.addColorStop(1, '#3a5070');
@@ -276,6 +323,8 @@ export const CYBER_BUILDERS = {
     const tower = new THREE.Group(); tower.position.set(0, 0, -3); g.add(tower);
     mesh(ft.geo, shellM, 0, 0, 0, tower);
     mesh(ft.cap, mat('#eef1f4'), 0, 0, 0, tower);
+    const tr = terraceGeo(K, ft, [0.22, 0.42, 0.62, 0.8], 1.18, 0.45); // 空中花園露台
+    mesh(tr.geo, mat('#eef1f4'), 0, 0, 0, tower); plantShrubs(K, tower, tr.plants, 0.7);
     col(0, -3, 7);
     // 霓虹輪廓線：沿著幾圈樓板勾出曲面，夜裡最明顯
     const contours = [10, 20, 30, 40, 48].map((ri, i) => {
@@ -569,11 +618,14 @@ export const CYBER_BUILDERS = {
     const { THREE, scene, regions, colliders, isTouch, heightAt, hash2, sstep, animators } = K;
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), col = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
     // 1. 高樓：離區域較遠的點蓋大樓，其餘種霓虹樹
-    const towers = [], trees = [];
+    // 建築少一點、綠樹多一點：霓虹樹與綠色闊葉樹混種
+    const towers = [], trees = [], greens = [];
     pts.forEach((pt, i) => {
-      if (pt.nearD > 34 && towers.length < (isTouch ? 70 : 120) && hash2(pt.x, pt.z) < 0.4) towers.push(pt);
-      else if (i % 3 === 0) trees.push(pt);
+      if (pt.nearD > 34 && towers.length < (isTouch ? 36 : 60) && hash2(pt.x, pt.z) < 0.22) towers.push(pt);
+      else if (i % 4 === 0) trees.push(pt);
+      else if (i % 4 !== 3) greens.push(pt);
     });
+    const plants = []; // 露台植栽（世界座標），最後一起種
     // 全城建築：三種參數化造型輪流出現——
     //   低矮：Meta-ball 融合體；中高層：旋轉樓板疊層塔與流線扭轉塔輪流；超高層：以流線塔為主、穿插疊層塔
     // 流線塔：四個高度級距 × 兩種形體，共八個原型，用實例化擺滿全城
@@ -588,7 +640,9 @@ export const CYBER_BUILDERS = {
     const specs = towers.map((pt, i) => {
       const h = 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z)), rnd = hash2(i, 7);
       const kind = h < 13 ? (rnd < 0.85 ? 'blob' : 'plate') : h < 24 ? (i % 2 ? 'plate' : 'fluid') : (rnd < 0.35 ? 'plate' : 'fluid');
-      return { pt, i, w: 3 + hash2(i, 1) * 3, d: 3 + hash2(i, 2) * 3, h, kind };
+      // 中高層量體要夠粗壯（斷面不小於高度的四分之一左右），避免一根根細長
+      const big = kind !== 'blob', w = big ? Math.max(5.5, h * 0.24) + hash2(i, 1) * 3 : 3 + hash2(i, 1) * 3, d = big ? Math.max(5, h * 0.22) + hash2(i, 2) * 3 : 3 + hash2(i, 2) * 3;
+      return { pt, i, w, d, h, kind };
     });
     // Meta-ball 融合體：四個原型，壓低、放寬成展館或住宅般的量體
     const blobs = specs.filter((sp) => sp.kind === 'blob'), bMat = blobMat(K, true);
@@ -605,10 +659,14 @@ export const CYBER_BUILDERS = {
     });
     // 旋轉樓板疊層塔：所有樓板共用一個實例化網格，核心筒另一個
     const plateTowers = specs.filter((sp) => sp.kind === 'plate'), plateList = [];
-    plateTowers.forEach((sp) => plateSpec(K, sp.w, sp.h, sp.d, sp.i).forEach((pl, k, arr) => plateList.push({ sp, pl, top: k === arr.length - 1 })));
+    plateTowers.forEach((sp) => {
+      const rot0 = hash2(sp.i, 4) * 6.28, pls = plateSpec(K, sp.w, sp.h, sp.d, sp.i).map((pl) => ({ ...pl, r: pl.r + rot0 }));
+      pls.forEach((pl, k) => plateList.push({ sp, pl, top: k === pls.length - 1 }));
+      plateRim(K, pls, sp.i).forEach((v) => plants.push(v.add(p.set(sp.pt.x, sp.pt.h, sp.pt.z))));
+    });
     const plateM = new THREE.InstancedMesh(plateGeo(K), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }), plateList.length);
     plateList.forEach(({ sp, pl, top }, k) => {
-      q.setFromAxisAngle(up, pl.r + hash2(sp.i, 4) * 6.28);
+      q.setFromAxisAngle(up, pl.r);
       m4.compose(p.set(sp.pt.x, sp.pt.h + pl.y, sp.pt.z), q, s.set(pl.a, 1, pl.b)); plateM.setMatrixAt(k, m4);
       plateM.setColorAt(k, col.set(top ? NEON[sp.i % NEON.length] : '#f2f4f7'));
     });
@@ -616,7 +674,7 @@ export const CYBER_BUILDERS = {
     const coreM = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 16), new THREE.MeshStandardMaterial({ color: '#7d95b5', roughness: 0.25, metalness: 0.3, emissive: '#bfefff', emissiveIntensity: 0.1 }), plateTowers.length);
     coreM.material.userData.day = 0.08; coreM.material.userData.night = 1.3;
     plateTowers.forEach((sp, k) => {
-      const cr = Math.min(sp.w, sp.d) * 0.22;
+      const cr = Math.min(sp.w, sp.d) * 0.3;
       m4.compose(p.set(sp.pt.x, sp.pt.h + sp.h / 2, sp.pt.z), q.identity(), s.set(cr, sp.h, cr)); coreM.setMatrixAt(k, m4);
       colliders.push({ x: sp.pt.x, z: sp.pt.z, r: Math.max(sp.w, sp.d) * 0.5 });
     });
@@ -626,15 +684,34 @@ export const CYBER_BUILDERS = {
       if (!list.length) return;
       const ft = fluidTower(K, bh, 16, 20, paramSection({ w: 2.25, d: 2.25, ...vr }), 2.4);
       const body = new THREE.InstancedMesh(ft.geo, towerMat, list.length), cap = new THREE.InstancedMesh(ft.cap, capMat, list.length);
+      // 18 公尺以上的流線塔加空中露台（樓板＋植栽）
+      const tr = bi > 0 ? terraceGeo(K, ft, bi > 2 ? [0.25, 0.48, 0.7] : [0.35, 0.65], 1.25, 0.3) : null;
+      const slab = tr && new THREE.InstancedMesh(tr.geo, new THREE.MeshStandardMaterial({ color: '#eef1f4', roughness: 0.5 }), list.length);
       list.forEach(({ pt, i, w, d, h }, k) => {
         q.setFromAxisAngle(up, hash2(i, 4) * 6.28);
         m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); body.setMatrixAt(k, m4); cap.setMatrixAt(k, m4);
+        if (tr) { slab.setMatrixAt(k, m4); tr.plants.forEach((v) => plants.push(v.clone().applyMatrix4(m4))); }
         body.setColorAt(k, col.set(['#ffffff', '#e8eef6', '#f4f0f8'][i % 3]));
         cap.setColorAt(k, col.set(NEON[i % NEON.length]));
         colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.6 });
       });
       body.castShadow = true; body.receiveShadow = true; scene.add(body, cap);
+      if (slab) { slab.castShadow = true; slab.receiveShadow = true; scene.add(slab); }
     }));
+    plantShrubs(K, scene, plants, 0.6);
+    // 綠色闊葉樹：樹幹＋兩團圓樹冠，填在建築之間
+    const gTrunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.28, 2.4, 6), K.mat('#8a7a68'), greens.length);
+    const gCrown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), K.mat('#ffffff'), greens.length * 2);
+    greens.forEach((pt, i) => {
+      const sc = 0.8 + hash2(i, 12) * 0.7;
+      m4.compose(p.set(pt.x, pt.h + 1.1 * sc, pt.z), q.identity(), s.set(sc, sc, sc)); gTrunk.setMatrixAt(i, m4);
+      m4.compose(p.set(pt.x, pt.h + 3 * sc, pt.z), q, s.set(1.6 * sc, 1.4 * sc, 1.6 * sc)); gCrown.setMatrixAt(i * 2, m4);
+      m4.compose(p.set(pt.x + 0.7 * sc, pt.h + 3.9 * sc, pt.z - 0.4 * sc), q, s.set(1.05 * sc, 0.95 * sc, 1.05 * sc)); gCrown.setMatrixAt(i * 2 + 1, m4);
+      const c0 = PLANT_C[i % PLANT_C.length];
+      gCrown.setColorAt(i * 2, col.set(c0)); gCrown.setColorAt(i * 2 + 1, col.set(c0).offsetHSL(0.01, 0, 0.06));
+      colliders.push({ x: pt.x, z: pt.z, r: 0.5 * sc + 0.2, tree: true });
+    });
+    gTrunk.castShadow = gCrown.castShadow = true; gCrown.receiveShadow = true; scene.add(gTrunk, gCrown);
     // 2. 霓虹樹：細樹幹＋發光的錐形樹冠
     const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.2, 2, 5), new THREE.MeshStandardMaterial({ color: '#8a93a3', roughness: 0.5, metalness: 0.4 }), trees.length);
     const crownM = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 2.6, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, toneMapped: false }), trees.length);
