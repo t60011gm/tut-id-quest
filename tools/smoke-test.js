@@ -139,11 +139,11 @@ async function run(browser, name, opts) {
   await page.evaluate(() => window.__quest.setHour(12));
   await page.waitForTimeout(500);
   await page.click('#btn-daynight'); await page.waitForTimeout(500);
-  const toNight = await page.evaluate(() => Math.floor(window.__quest.dayNight.hour));
+  const toNight = await page.evaluate(() => Math.floor(window.__quest.getHour())); // 直接讀時鐘，不等下一幀畫面
   await page.click('#clock'); await page.waitForTimeout(300);
   await page.evaluate(() => { const r = document.querySelector('#tp-range'); r.value = 7; r.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(500);
-  const tp = await page.evaluate(() => ({ open: !document.querySelector('#time-panel').hidden, h: Math.floor(window.__quest.dayNight.hour), label: document.querySelector('#tp-now').textContent }));
+  const tp = await page.evaluate(() => ({ open: !document.querySelector('#time-panel').hidden, h: Math.floor(window.__quest.getHour()), label: document.querySelector('#tp-now').textContent }));
   await shot('time');
   await page.keyboard.press('Escape');
   check('日夜切換與時間拉桿', toNight === 21 && tp.open && tp.h === 7 && tp.label === '7 時', `夜晚 ${toNight} 時、拉桿 ${tp.h} 時`);

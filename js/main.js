@@ -3111,4 +3111,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { setHour, dayNight: dn, state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo, quests };
+window.__quest = { setHour, getHour: hourNow, dayNight: dn, state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo, quests };
