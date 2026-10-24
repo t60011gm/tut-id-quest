@@ -9,7 +9,7 @@
  *   兼任教師：另依系上提供的「114-2 擬新聘兼任教師名冊」「115-1 擬續聘兼任教師名冊」（2026-10）補充
  *             職稱、授課、學歷與經歷；名冊中的出生年月與證書字號屬個人資料，不放上網站
  *   徐灝：另參考銘傳大學建築系師資頁等公開資料
- *   吳宛蓉：照片由系上提供（2026-10）
+ *   吳宛蓉、徐灝：照片由系上提供（2026-10）
  *
  * 欄位說明
  *   regions[]  奇幻大陸上的區域（研究領域）
@@ -167,6 +167,7 @@ window.WORLD = {
       courses: ["設計運算與 AI 整合應用"],
       feats: ["加號設計數位工程有限公司（HJPLUS）負責人（112.11～迄今）", "國立成功大學建築研究所 博士班（2023～）", "曾任高仲廷建築師事務所 3D & BIM 專員、薩摩亞商澤新建築顧問 助理建築師", "第五屆海峽建築新人獎 銀獎（2014）", "天華竹構建造大賽 優秀獎（2018）", "Autodesk Revit Certified Professional（2017）", "McNeel Rhinoceros 3D 原廠國際認證暨授權講師（2015）"],
       url: "https://arch.mcu.edu.tw/%e5%be%90%e7%81%9d-%e6%95%b8%e4%bd%8d%e5%85%bc%e4%bb%bb%e8%ac%9b%e5%b8%ab/",
+      photo: "img/faculty/hsu-hao.jpg",
       lines: ["節點接上節點，參數就會開始說話。", "把 AI 接進設計流程，從建模到出圖都能更聰明。", "設計運算不是炫技，是讓重複的事交給電腦。"],
       look: { hair: "swept", hairColor: "#16110f", glasses: "square", top: "blazer", topColor: "#1f2024", inner: "#7d7f85", sleeves: "long", pants: "#26272c", prop: "nodes" }
     },
