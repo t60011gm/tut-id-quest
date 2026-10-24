@@ -18,9 +18,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=16">
+<link rel="stylesheet" href="css/style.css?v=17">
 </head>
 <body>
+<script>
+  // 先套用上次選的世界觀配色，避免載入時閃一下別的主題（main.js 會再確認一次）
+  (function () {
+    var w = new URLSearchParams(location.search).get('world');
+    try { w = w || localStorage.getItem('tutIdQuest.world.v1'); } catch (e) { /* 無法讀取就用預設 */ }
+    document.documentElement.dataset.world = ['fantasy', 'modern', 'cyber'].indexOf(w) >= 0 ? w : 'fantasy';
+  })();
+</script>
 
 <div id="stage" aria-label="3D 大陸地圖"></div>
 <div id="labels"></div>
@@ -99,7 +107,7 @@
   <div class="chips" id="codex-chips"></div>
   <div class="codex-list" id="codex-list"></div>
   <div class="quest-log" id="quest-log"></div>
-  <button class="reset-btn" id="btn-reset" type="button">重新開始冒險</button>
+  <div class="codex-foot"><button class="reset-btn" id="btn-world" type="button">切換世界</button><button class="reset-btn" id="btn-reset" type="button">重新開始冒險</button></div>
 </aside>
 
 <!-- 採集戰（正常版在 3D 採集場時的資訊列） -->
@@ -145,9 +153,8 @@
     <div class="eyebrow">TUT · INTERIOR DESIGN · M.A.</div>
     <h1 class="title"><span>南應大室研所</span><span>大冒險</span></h1>
     <p class="sub"><span>台南應用科技大學 室內設計系碩士班</span><span class="sep"> · </span><span>師資探險地圖</span></p>
-    <p class="lore">在這片大陸上，<b>六個區域</b>各自守護著一門設計技藝。<br><!--
-      -->除了王都，<b>未探索的區域都被白霧遮蔽</b>，走近或點擊旗幟才會散去。<br><!--
-      -->驅散迷霧、拜訪<b>十二位導師</b>，找到你的指導教授。</p>
+    <div class="world-pick" role="radiogroup" aria-label="選擇遊玩的世界"></div>
+    <p class="lore" id="intro-lore"></p>
     <div class="ctrl">
       <div class="plate"><b>導覽模式</b><span>拖曳旋轉視角、滾輪縮放；點擊區域旗幟或導師名牌，鏡頭會飛過去。</span></div>
       <div class="plate"><b>探險模式</b><span>用 WASD 或方向鍵（手機用搖桿）走動，靠近導師按 E 或「對話」。</span></div>
@@ -161,7 +168,7 @@
 <div id="complete" class="overlay" hidden>
   <div class="title-card">
     <div class="eyebrow">QUEST COMPLETE</div>
-    <h1>大陸已走遍</h1>
+    <h1 id="complete-title">大陸已走遍</h1>
     <p class="lore">你已拜訪全部 <b>十二位導師</b>。<br>下一段旅程，從報考碩士班開始。</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
       <a class="btn primary go" id="cta-admissions" target="_blank" rel="noopener">招生資訊</a>
@@ -171,13 +178,14 @@
   </div>
 </div>
 
-<div id="loading">正在繪製大陸⋯</div>
+<div id="loading">正在繪製世界⋯</div>
 <div id="webgl-error" hidden>
   <p>你的瀏覽器無法顯示 3D 地圖。請改用新版 Chrome、Edge 或 Safari 開啟，<br>或直接前往 <a href="https://id.tut.edu.tw/p/403-1067-1265.php?Lang=zh-tw">本系師資頁面</a>。</p>
 </div>
 
 <script src="data/faculty.js?v=7"></script>
 <script src="data/quests.js?v=3"></script>
+<script src="data/worlds.js?v=1"></script>
 <script type="importmap">
 {
   "imports": {
@@ -187,6 +195,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=13"></script>
+<script type="module" src="js/main.js?v=14"></script>
 </body>
 </html>

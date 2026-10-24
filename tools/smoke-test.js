@@ -17,7 +17,7 @@ function loadPlaywright() {
 const root = path.resolve(__dirname, '..');
 const outDir = path.resolve(process.argv[2] || path.join(root, 'dist/screens'));
 const PORT = 8000 + Math.floor(Math.random() * 900);
-const BASE = `http://localhost:${PORT}/`;
+const BASE = `http://localhost:${PORT}/${process.env.WORLD ? '?world=' + process.env.WORLD : ''}`; // WORLD=modern／cyber 測其他世界觀
 const VIEWPORTS = {
   desktop: { viewport: { width: 1440, height: 900 } },
   mobile: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }
@@ -29,6 +29,7 @@ const check = (name, ok, detail = '') => {
   if (!ok) failures.push(name);
 };
 
+const WORLD_EXPECT = process.env.WORLD || 'fantasy';
 async function run(browser, name, opts) {
   console.log(`\n[${name}]`);
   const page = await browser.newPage(opts);
@@ -42,6 +43,10 @@ async function run(browser, name, opts) {
   await page.evaluate(() => { localStorage.clear(); });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#loading.done', { timeout: 90000 });
+  // 開場選世界：三張世界卡，目前的世界被選取
+  const wp = await page.evaluate(() => ({ n: document.querySelectorAll('.world-card').length, cur: document.querySelector('.world-card[aria-checked="true"]')?.dataset.world, html: document.documentElement.dataset.world }));
+  check('世界選單', wp.n === 3 && wp.cur === wp.html && wp.cur === WORLD_EXPECT, `${wp.cur}`.replace('undefined', '無'));
+  await shot('intro');
   await page.click('#btn-start');
   await page.waitForTimeout(3500);
   await shot('tour');

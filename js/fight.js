@@ -47,7 +47,7 @@ export function createArena(o) {
   let uid = 0;
   const timers = [];
   const E = {
-    R, G, type: o.type, hard: !!o.hard, k: o.hard ? 1 : 0.85, need: o.need, got: 0, t: 0,
+    R, G, type: o.type, world: o.world || 'fantasy', hard: !!o.hard, k: o.hard ? 1 : 0.85, need: o.need, got: 0, t: 0,
     done: false, result: null, reason: '',
     color: o.color || '#e2b45c', monster: o.monster, item: o.item,
     P: { x: 0, z: R - 3, face: Math.PI, hp: 5, max: 5, inv: 0, cd: 0, carry: null, speed: 7, moving: false, kx: 0, kz: 0 },
@@ -1013,11 +1013,18 @@ function drawPlayer(c, E, S, t) {
 export function draw2D(c, E, W, t) {
   const S = W / (2 * (E.R + 1));
   c.save(); c.clearRect(0, 0, W, W); c.translate(W / 2, W / 2);
-  // 地面
+  // 地面：奇幻是草地，現代是地磚廣場，未來是暗色地面加霓虹格線
+  const GROUND = { fantasy: ['#9fcf7a', '#6fae5a'], modern: ['#d9dcd6', '#b8bdb6'], cyber: ['#1f2440', '#11142a'] }[E.world] || ['#9fcf7a', '#6fae5a'];
   const g = c.createRadialGradient(0, 0, 10, 0, 0, E.R * S);
-  g.addColorStop(0, '#9fcf7a'); g.addColorStop(1, '#6fae5a');
+  g.addColorStop(0, GROUND[0]); g.addColorStop(1, GROUND[1]);
   c.fillStyle = g; c.beginPath(); c.arc(0, 0, E.R * S, 0, TAU); c.fill();
   c.fillStyle = E.color; c.globalAlpha = 0.12; c.fill(); c.globalAlpha = 1;
+  if (E.world !== 'fantasy') { // 地磚縫或霓虹格線
+    c.save(); c.beginPath(); c.arc(0, 0, E.R * S, 0, TAU); c.clip();
+    c.strokeStyle = E.world === 'cyber' ? 'rgba(62,240,255,.22)' : 'rgba(255,255,255,.5)'; c.lineWidth = 1;
+    for (let k = -E.R; k <= E.R; k += 1.5) { c.beginPath(); c.moveTo(k * S, -E.R * S); c.lineTo(k * S, E.R * S); c.moveTo(-E.R * S, k * S); c.lineTo(E.R * S, k * S); c.stroke(); }
+    c.restore();
+  }
   c.setLineDash([8, 7]); c.lineWidth = 3; c.strokeStyle = E.color; c.beginPath(); c.arc(0, 0, E.R * S, 0, TAU); c.stroke(); c.setLineDash([]);
   // 平放的東西
   for (const p of E.props) if (['vent', 'station', 'coin', 'node', 'chunk'].includes(p.kind)) drawProp(c, p, S, t, E);
@@ -1042,7 +1049,9 @@ export function draw2D(c, E, W, t) {
   // 立著的東西依前後排序
   const stand = [...E.props.filter((p) => !['vent', 'station', 'coin', 'node', 'chunk'].includes(p.kind)).map((p) => ({ z: p.z, f: () => drawProp(c, p, S, t, E) })),
     ...E.mons.map((m) => ({ z: m.z, f: () => drawMon(c, m, S, t) })), { z: E.P.z, f: () => drawPlayer(c, E, S, t) }];
+  if (E.world === 'cyber') { c.shadowColor = 'rgba(62,240,255,.8)'; c.shadowBlur = 10; } // 未來世界的霓虹光暈
   stand.sort((a, b) => a.z - b.z).forEach((o) => o.f());
+  c.shadowBlur = 0;
   for (const s of E.shots) { c.fillStyle = s.color; c.strokeStyle = s.enemy ? '#ffffff' : 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.beginPath(); c.arc(s.x * S, s.z * S, s.r * S, 0, TAU); c.fill(); c.stroke(); }
   for (const f of E.fx) if (f.kind === 'pop') { c.globalAlpha = 1 - (f.t / f.life) ** 2; label(c, f.x * S, f.z * S - 20 - f.t * 30, f.text, '#2c2216'); c.globalAlpha = 1; }
   c.restore();

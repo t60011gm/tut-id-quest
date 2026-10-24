@@ -1,17 +1,42 @@
 /* =========================================================================
  * 南應大室研所大冒險 · 主程式
- * Three.js 建構的奇幻大陸：地形、六大區域地標、導師 NPC、
+ * Three.js 建構的 3D 大陸：地形、六大區域地標、導師 NPC、
  * 「導覽模式」（點擊飛行）與「探險模式」（操控角色走動），以及所有介面。
- * 師資與區域內容請改 data/faculty.js，不需要動這個檔案。
+ * 三個世界觀（中古奇幻／現代城鎮／賽博未來）共用同一張地圖與同一批老師，
+ * 開場時選擇世界；現代與未來的地標在 js/world-modern.js、js/world-cyber.js。
+ * 師資與區域內容請改 data/faculty.js，世界觀文字改 data/worlds.js，不需要動這個檔案。
  * ========================================================================= */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=4';
+import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=5';
 import { installTrials } from './trials.js?v=2';
+import { MODERN_BUILDERS } from './world-modern.js?v=1';
+import { CYBER_BUILDERS } from './world-cyber.js?v=1';
 
 const W = window.WORLD;
+
+/* ---------- 世界觀：網址 ?world= 優先，其次是上次的選擇 ---------- */
+const WORLDS = window.WORLDS || { fantasy: {} };
+const WORLD_KEY = 'tutIdQuest.world.v1';
+const WORLD_ID = (() => {
+  let id = new URLSearchParams(location.search).get('world');
+  if (!WORLDS[id]) { try { id = localStorage.getItem(WORLD_KEY); } catch (e) { id = null; } }
+  return WORLDS[id] ? id : 'fantasy';
+})();
+const WD = WORLDS[WORLD_ID] || {};
+document.documentElement.dataset.world = WORLD_ID;
+document.querySelector('#loading').textContent = `正在繪製${WD.land || '世界'}⋯`;
+// 用世界觀的文字覆寫區域名稱、職業稱號與小怪名稱
+for (const r of W.regions) {
+  const o = (WD.regions || {})[r.id]; if (!o) continue;
+  for (const k of ['name', 'motto', 'desc']) if (o[k]) r[k] = o[k];
+  if (o.rune) r.rune = o.rune;
+  if (o.field && r.field) r.field.name = o.field;
+}
+for (const f of W.faculty) if ((WD.cls || {})[f.id]) f.cls = WD.cls[f.id];
+for (const [id, name] of Object.entries(WD.monsters || {})) { const q = window.QUESTS && window.QUESTS.teachers[id]; if (q) q.stage1.monster.name = name; }
 const $ = (s) => document.querySelector(s);
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,6 +67,44 @@ const MOOD = {
   plateau:  { fog: '#f0cfe0', hemi: '#ffe2f1', sun: '#ffe0ec' }
 };
 const DEFAULT_STYLE = { ground: '#7fb35a', foliage: '#4d8b44', floor: 3, flat: [22, 14], clear: 22, signY: 15 };
+/* 各世界的環境：天空（上／中／下）、海、光、地形用色，以及各區的地面色（ground）、植被色（foliage）與氛圍（MOOD） */
+const ENV = {
+  fantasy: {
+    sky: ['#3a72b5', '#f5d6ae', '#2a6f8f'], water: '#2f86a6', hemi: ['#d6e6ff', '#5b4a36', 1.5], sun: 2.6, exposure: 1.05,
+    terrain: { grass: '#78ad55', sand: '#e7d39c', wet: '#b9a675', rock: '#8d8273', path: '#dcc58e', pink: '#eeb2cc' }
+  },
+  modern: {
+    sky: ['#3f86d9', '#e4eef6', '#2f7ea8'], water: '#3a92b8', hemi: ['#e8f1ff', '#55603f', 1.65], sun: 2.7, exposure: 1.05,
+    terrain: { grass: '#7cbc58', sand: '#ddd2b0', wet: '#a8a089', rock: '#8e8e88', path: '#62666e', pink: '#c9d98f' },
+    style: {
+      capital: { ground: '#b9bdb4', foliage: '#4f9a45' }, forest: { ground: '#86c06a', foliage: '#3f8f4f' },
+      valley: { ground: '#8fc95e', foliage: '#5ea83e' }, workshop: { ground: '#c4b49a', foliage: '#6fa04a' },
+      market: { ground: '#c9bfae', foliage: '#5e9c3e' }, plateau: { ground: '#d7c9e6', foliage: '#e39ab8' }
+    },
+    mood: {
+      capital: { fog: '#dfe8f0', hemi: '#e8f1ff', sun: '#fff3df' }, forest: { fog: '#d6ecf2', hemi: '#e0f6ff', sun: '#f2f8ff' },
+      valley: { fog: '#e2f2dc', hemi: '#eeffe6', sun: '#fff8e0' }, workshop: { fog: '#efe2cf', hemi: '#fff0dc', sun: '#ffe6c4' },
+      market: { fog: '#f2e2d6', hemi: '#fff0e6', sun: '#ffe6cc' }, plateau: { fog: '#efe0ef', hemi: '#fff0fa', sun: '#fff0f4' }
+    }
+  },
+  cyber: {
+    sky: ['#070820', '#3b1758', '#04030c'], water: '#0a1730', hemi: ['#6f5cff', '#0d1226', 1.05], sun: 1.35, exposure: 1.2,
+    terrain: { grass: '#262b40', sand: '#2b2d44', wet: '#171a2c', rock: '#34374e', path: '#11131f', pink: '#4a2a5e' },
+    style: {
+      capital: { ground: '#2c2848', foliage: '#ff4fd8' }, forest: { ground: '#18304a', foliage: '#3ee6ff' },
+      valley: { ground: '#1d3a34', foliage: '#4dffb0' }, workshop: { ground: '#3a2a22', foliage: '#ff9a3c' },
+      market: { ground: '#3a1f3a', foliage: '#ff5d8f' }, plateau: { ground: '#33204e', foliage: '#c77dff' }
+    },
+    mood: {
+      capital: { fog: '#2a1846', hemi: '#8a6cff', sun: '#b9c8ff' }, forest: { fog: '#0f2a46', hemi: '#4fd8ff', sun: '#9fe9ff' },
+      valley: { fog: '#123a36', hemi: '#5affc0', sun: '#bfffe6' }, workshop: { fog: '#3a2018', hemi: '#ffaa66', sun: '#ffd0a0' },
+      market: { fog: '#3a1032', hemi: '#ff6fb0', sun: '#ffc2e0' }, plateau: { fog: '#2c1450', hemi: '#c88cff', sun: '#e6c8ff' }
+    }
+  }
+};
+const EV = ENV[WORLD_ID] || ENV.fantasy;
+for (const [id, o] of Object.entries(EV.style || {})) STYLE[id] = { ...STYLE[id], ...o };
+for (const [id, o] of Object.entries(EV.mood || {})) MOOD[id] = o;
 
 /* ---------- 資料前處理 ---------- */
 const regions = W.regions;
@@ -54,6 +117,7 @@ regions.forEach((r) => {
     r.toward = new THREE.Vector2(-Math.sin(a), Math.cos(a)); // 指向王都
   }
   r.style = { ...DEFAULT_STYLE, rune: r.id.toUpperCase(), ...STYLE[r.id] };
+  if (r.rune) r.style.rune = r.rune;
   r.floor = r.style.floor;
   r.flat = r.style.flat;
   r.col = new THREE.Color(r.color);
@@ -138,14 +202,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = EV.exposure;
 $('#stage').appendChild(renderer.domElement);
 
 const labelRenderer = new CSS2DRenderer({ element: $('#labels') });
 labelRenderer.setSize(window.innerWidth, window.innerHeight);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog('#ead2b2', 210, 520);
+scene.fog = new THREE.Fog(MOOD.capital.fog, 210, 520);
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 1500);
 camera.position.set(0, 160, 225);
 
@@ -156,7 +220,7 @@ let skyMat, hemi, sunLight;
     new THREE.SphereGeometry(700, 32, 16),
     skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { top: { value: new THREE.Color('#3a72b5') }, mid: { value: new THREE.Color('#f5d6ae') }, bot: { value: new THREE.Color('#2a6f8f') } },
+      uniforms: { top: { value: new THREE.Color(EV.sky[0]) }, mid: { value: new THREE.Color(EV.sky[1]) }, bot: { value: new THREE.Color(EV.sky[2]) } },
       vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
       fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 bot; varying vec3 vW; void main(){ float h = normalize(vW).y; vec3 c = h > 0.0 ? mix(mid, top, pow(h, 0.55)) : mix(mid, bot, pow(-h, 0.4)); gl_FragColor = vec4(c, 1.0); }'
     })
@@ -165,14 +229,14 @@ let skyMat, hemi, sunLight;
 
   const water = new THREE.Mesh(
     new THREE.CircleGeometry(650, 72),
-    new THREE.MeshStandardMaterial({ color: '#2f86a6', roughness: 0.3, metalness: 0.1 })
+    new THREE.MeshStandardMaterial({ color: EV.water, roughness: 0.3, metalness: 0.1, emissive: WORLD_ID === 'cyber' ? '#08243f' : '#000000' })
   );
   water.rotation.x = -Math.PI / 2; water.position.y = 0.05; water.receiveShadow = true;
   scene.add(water);
 
-  hemi = new THREE.HemisphereLight('#d6e6ff', '#5b4a36', 1.5);
+  hemi = new THREE.HemisphereLight(...EV.hemi);
   scene.add(hemi);
-  const sun = sunLight = new THREE.DirectionalLight('#ffe0b5', 2.6);
+  const sun = sunLight = new THREE.DirectionalLight(MOOD.capital.sun, EV.sun);
   sun.position.set(-90, 130, 70);
   sun.castShadow = true;
   const sc = sun.shadow.camera;
@@ -321,8 +385,9 @@ function regionCtx(r) {
   geo.computeVertexNormals();
   const nrm = geo.attributes.normal;
   const col = new Float32Array(pos.count * 3);
-  const grass = new THREE.Color('#78ad55'), sand = new THREE.Color('#e7d39c'), wet = new THREE.Color('#b9a675');
-  const rock = new THREE.Color('#8d8273'), path = new THREE.Color('#dcc58e'), pink = new THREE.Color('#eeb2cc');
+  const T = EV.terrain;
+  const grass = new THREE.Color(T.grass), sand = new THREE.Color(T.sand), wet = new THREE.Color(T.wet);
+  const rock = new THREE.Color(T.rock), path = new THREE.Color(T.path), pink = new THREE.Color(T.pink);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const { h, pathW, near, nearD, fieldW, field } = infos[i];
@@ -1240,14 +1305,22 @@ function buildPlateau(r) {
 }
 
 const BUILDERS = { capital: buildCapital, forest: buildForest, valley: buildValley, workshop: buildWorkshop, market: buildMarket, plateau: buildPlateau };
-regions.forEach((r) => (BUILDERS[r.id] || (() => regionCtx(r)))(r));
+/* 給 js/world-*.js 用的工具箱：地標、植被與裝飾都用同一套工具建構 */
+const K = {
+  THREE, scene, regions, RG, fields, FIELD_R, isTouch, animators, colliders,
+  regionCtx, mesh, mat, texMat, canvasTex, drapedPlane, groundFX, sparkles, camNear, dyn, hash2, sstep,
+  heightAt, terrainInfo, isClear, playerLocal: (g, out) => playerLocal(g, out)
+};
+const WORLD_BUILDERS = { modern: MODERN_BUILDERS, cyber: CYBER_BUILDERS }[WORLD_ID] || BUILDERS;
+regions.forEach((r) => (WORLD_BUILDERS[r.id] ? WORLD_BUILDERS[r.id](r, K) : regionCtx(r)));
 
 /* ---------- 任務採集場：燈柱圍成的圓、地面虛線邊界與名牌 ---------- */
 const fieldSigns = [];
 fields.forEach((f, fi) => {
   const g = new THREE.Group(); g.position.set(f.x, 0, f.z); scene.add(g);
   const ctx = { g, ly: (u, v) => heightAt(f.x + u, f.z + v) };
-  const post = texMat('wood', '#8a5a36'), lamp = mat(f.r.color, { emissive: f.r.color, emissiveIntensity: 0.9 });
+  const post = WORLD_ID === 'fantasy' ? texMat('wood', '#8a5a36') : mat(WORLD_ID === 'modern' ? '#a3a8b0' : '#23263a');
+  const lamp = mat(f.r.color, { emissive: f.r.color, emissiveIntensity: WORLD_ID === 'cyber' ? 1.6 : 0.9 });
   for (let k = 0; k < 8; k++) {
     const a = k / 8 * Math.PI * 2 + 0.2, u = Math.cos(a) * (FIELD_R + 0.6), v = Math.sin(a) * (FIELD_R + 0.6), y = ctx.ly(u, v);
     mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 6), post, u, y + 1.1, v, g);
@@ -1289,6 +1362,11 @@ fields.forEach((f, fi) => {
     if (bad || !isClear(x, z, 1.2)) continue;
     pts.push({ x, z, h: inf.h, near: inf.near, nearD: inf.nearD });
   }
+  const scenery = { modern: MODERN_BUILDERS.scenery, cyber: CYBER_BUILDERS.scenery }[WORLD_ID] || fantasyScenery;
+  scenery(pts, K);
+}
+/* 中古奇幻的植被：松樹、圓樹與岩石 */
+function fantasyScenery(pts) {
   const pines = pts.filter((_, i) => i % 5 < 3), rounds = pts.filter((_, i) => i % 5 >= 3);
   const trunkGeo = new THREE.CylinderGeometry(0.22, 0.38, 1.8, 5);
   const trunkMat = new THREE.MeshStandardMaterial({ color: '#6b4a2f', flatShading: true });
@@ -1342,9 +1420,12 @@ fields.forEach((f, fi) => {
   rockM.castShadow = true; rockM.receiveShadow = true; scene.add(rockM);
 }
 
-/* ---------- 雲 ---------- */
+/* ---------- 雲（未來都市是低空的霓虹霧霾） ---------- */
 {
-  const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', flatShading: true, emissive: '#fff4e6', emissiveIntensity: 0.25, roughness: 1 });
+  const cyberSky = WORLD_ID === 'cyber';
+  const cloudMat = new THREE.MeshStandardMaterial(cyberSky
+    ? { color: '#3a2a5e', flatShading: true, emissive: '#5a2a8a', emissiveIntensity: 0.35, roughness: 1, transparent: true, opacity: 0.7 }
+    : { color: '#ffffff', flatShading: true, emissive: '#fff4e6', emissiveIntensity: 0.25, roughness: 1 });
   const clouds = [];
   for (let i = 0; i < 13; i++) {
     const c = new THREE.Group();
@@ -1445,10 +1526,27 @@ function buildTop(lk, g, r) {
   } else if (lk.top === 'sweater') {
     const c = mesh(new THREE.TorusGeometry(0.28, 0.08, 6, 14), top, 0, 2.16, 0, g); c.rotation.x = Math.PI / 2;
   }
-  // 區域徽章：胸前一顆區域色寶石
-  const badge = mesh(new THREE.OctahedronGeometry(0.11), mat(r.color, { emissive: r.color, emissiveIntensity: 0.8 }), -0.26, 1.86, 0.55, g);
-  badge.castShadow = false;
+  worldGear(g, r);
   return torso;
+}
+
+/* 區域識別：奇幻是胸前的區域色寶石，現代是掛繩識別證，未來是霓虹肩線、腰帶、耳機與全像徽章 */
+function worldGear(g, r) {
+  const flat = (m) => { m.castShadow = false; return m; };
+  if (WORLD_ID === 'modern') {
+    const strap = mat(r.color);
+    for (const sx of [-1, 1]) { const st = flat(mesh(new THREE.BoxGeometry(0.05, 0.62, 0.03), strap, sx * 0.16, 1.92, 0.52, g)); st.rotation.set(-0.15, 0, sx * -0.3); }
+    flat(mesh(new THREE.BoxGeometry(0.26, 0.34, 0.03), mat('#ffffff'), 0, 1.58, 0.6, g));
+    flat(mesh(new THREE.BoxGeometry(0.22, 0.08, 0.01), mat(r.color), 0, 1.69, 0.62, g));
+    flat(mesh(new THREE.BoxGeometry(0.1, 0.12, 0.01), mat('#c9ced6'), -0.05, 1.54, 0.62, g));
+  } else if (WORLD_ID === 'cyber') {
+    const neon = mat(r.color, { emissive: r.color, emissiveIntensity: 1.6 });
+    for (const sx of [-1, 1]) flat(mesh(new THREE.BoxGeometry(0.07, 0.07, 0.95), neon, sx * 0.46, 2.1, 0, g));
+    const belt = flat(mesh(new THREE.TorusGeometry(0.6, 0.04, 4, 24), neon, 0, 0.98, 0, g)); belt.rotation.x = Math.PI / 2;
+    flat(mesh(new THREE.BoxGeometry(0.12, 0.26, 0.2), mat('#1b1e2c'), 0.64, HEAD_Y, 0, g));
+    flat(mesh(new THREE.BoxGeometry(0.03, 0.03, 0.42), neon, 0.6, HEAD_Y - 0.1, 0.28, g));
+    flat(mesh(new THREE.OctahedronGeometry(0.13), neon, -0.26, 1.86, 0.6, g));
+  } else flat(mesh(new THREE.OctahedronGeometry(0.11), mat(r.color, { emissive: r.color, emissiveIntensity: 0.8 }), -0.26, 1.86, 0.55, g));
 }
 
 /* 手臂：以肩膀為軸，方便揮手與拿道具 */
@@ -1860,16 +1958,30 @@ applyFogState();
  * ========================================================================= */
 const player = new THREE.Group();
 {
-  const tunic = mat('#2f5fd0'), skin = mat('#f0c8a0'), dark = mat('#1d1a18'), hair = mat('#4a2f1c'), pack = mat('#8a5a34'), scarf = mat('#c8413a');
+  // 依世界換裝：奇幻是冒險者斗篷與圍巾；現代是帽 T 與耳機；未來是霓虹夾克與護目鏡
+  const OUTFIT = {
+    fantasy: { top: '#2f5fd0', legs: '#3a2d24', pack: '#8a5a34', neck: '#c8413a' },
+    modern: { top: '#f0a33a', legs: '#33486e', pack: '#2c3e50', neck: '#f0a33a' },
+    cyber: { top: '#1b1f33', legs: '#14172a', pack: '#262a40', neck: '#3ef0ff' }
+  }[WORLD_ID];
+  const tunic = mat(OUTFIT.top), skin = mat('#f0c8a0'), dark = mat('#1d1a18'), hair = mat('#4a2f1c'), pack = mat(OUTFIT.pack);
+  const scarf = mat(OUTFIT.neck, WORLD_ID === 'cyber' ? { emissive: OUTFIT.neck, emissiveIntensity: 1.4 } : {});
   const body = new THREE.Group(); player.add(body); player.userData.body = body;
-  for (const sx of [-0.26, 0.26]) { const leg = mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.8, 6), mat('#3a2d24'), sx, 0.4, 0, body); leg.userData.leg = sx; }
+  for (const sx of [-0.26, 0.26]) { const leg = mesh(new THREE.CylinderGeometry(0.17, 0.2, 0.8, 6), mat(OUTFIT.legs), sx, 0.4, 0, body); leg.userData.leg = sx; }
   mesh(new THREE.CylinderGeometry(0.45, 0.66, 1.3, 10), tunic, 0, 1.35, 0, body);
-  mesh(new THREE.TorusGeometry(0.42, 0.13, 6, 14), scarf, 0, 1.98, 0, body).rotation.x = Math.PI / 2;
+  mesh(new THREE.TorusGeometry(0.42, WORLD_ID === 'cyber' ? 0.06 : 0.13, 6, 14), scarf, 0, 1.98, 0, body).rotation.x = Math.PI / 2;
   mesh(new THREE.SphereGeometry(0.55, 14, 12), skin, 0, 2.5, 0, body);
   mesh(new THREE.SphereGeometry(0.58, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 2.58, -0.04, body);
   for (const sx of [-0.19, 0.19]) mesh(new THREE.SphereGeometry(0.075, 6, 5), dark, sx, 2.55, 0.5, body).castShadow = false;
   mesh(new THREE.BoxGeometry(0.85, 0.95, 0.42), pack, 0, 1.45, -0.58, body);
-  mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 8), mat('#d8c39a'), 0, 2.02, -0.58, body).rotation.z = Math.PI / 2;
+  if (WORLD_ID === 'fantasy') mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 8), mat('#d8c39a'), 0, 2.02, -0.58, body).rotation.z = Math.PI / 2;
+  else if (WORLD_ID === 'modern') { // 耳機
+    const band = mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 16, Math.PI), mat('#2b2f36'), 0, 2.55, 0, body); band.rotation.y = Math.PI / 2;
+    for (const sx of [-0.6, 0.6]) mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 12), mat('#2b2f36'), sx, 2.5, 0, body).rotation.z = Math.PI / 2;
+  } else { // 護目鏡與背包燈條
+    mesh(new THREE.BoxGeometry(0.9, 0.16, 0.2), mat('#3ef0ff', { emissive: '#3ef0ff', emissiveIntensity: 1.5 }), 0, 2.56, 0.42, body).castShadow = false;
+    mesh(new THREE.BoxGeometry(0.06, 0.8, 0.44), mat('#ff4fd8', { emissive: '#ff4fd8', emissiveIntensity: 1.5 }), 0, 1.45, -0.58, body).castShadow = false;
+  }
   const arms = [];
   for (const sx of [-1, 1]) {
     const piv = new THREE.Group(); piv.position.set(sx * 0.6, 1.85, 0); body.add(piv);
@@ -2363,7 +2475,12 @@ const toMap = (x, z) => [(x + WORLD_HALF) / (WORLD_HALF * 2) * MM, (z + WORLD_HA
 const mmBase = document.createElement('canvas'); mmBase.width = mmBase.height = MM;
 {
   const b = mmBase.getContext('2d'), step = 3, c = new THREE.Color();
-  const grass = new THREE.Color('#6f9f50'), sea = new THREE.Color('#25607a'), shallow = new THREE.Color('#3d8aa6'), sand = new THREE.Color('#e2cc92'), path = new THREE.Color('#e3cf98');
+  const MMC = { // 小地圖配色跟著世界觀
+    fantasy: ['#6f9f50', '#25607a', '#3d8aa6', '#e2cc92', '#e3cf98'],
+    modern: ['#76b354', '#2a6f95', '#4596bd', '#d9cfb0', '#8a8f98'],
+    cyber: ['#2a2f48', '#081428', '#10284a', '#2e3150', '#3ef0ff']
+  }[WORLD_ID].map((h) => new THREE.Color(h));
+  const [grass, sea, shallow, sand, path] = MMC;
   for (let py = 0; py < MM; py += step) for (let px = 0; px < MM; px += step) {
     const x = (px / MM) * WORLD_HALF * 2 - WORLD_HALF, z = (py / MM) * WORLD_HALF * 2 - WORLD_HALF;
     const { h, pathW, near, nearD } = terrainInfo(x, z);
@@ -2443,7 +2560,35 @@ function showFogTip() {
   clearTimeout(showFogTip.timer); showFogTip.timer = setTimeout(() => { tip.hidden = true; }, 12000);
 }
 $('#tip-close').addEventListener('click', () => { $('#tip').hidden = true; });
+/* ---------- 開場：選擇世界。換世界會重新載入，背景直接換成那個世界的預覽 ---------- */
+const WORLD_ART = {
+  fantasy: '<svg viewBox="0 0 120 64"><rect width="120" height="64" fill="#7fb6e6"/><circle cx="96" cy="16" r="8" fill="#ffe7a8"/><path d="M0 52 Q40 36 80 48 T120 44 V64 H0Z" fill="#6fae4f"/><g fill="#efe3c8"><rect x="44" y="26" width="32" height="22"/><rect x="40" y="18" width="9" height="30"/><rect x="71" y="18" width="9" height="30"/><rect x="55" y="12" width="10" height="36"/></g><g fill="#c24a33"><path d="M39 18l5.5-8 5.5 8z"/><path d="M70 18l5.5-8 5.5 8z"/><path d="M54 12l6-9 6 9z"/></g><rect x="56" y="38" width="8" height="10" rx="4" fill="#5b4a3a"/></svg>',
+  modern: '<svg viewBox="0 0 120 64"><rect width="120" height="64" fill="#8ec5f0"/><circle cx="20" cy="15" r="7" fill="#fff3c4"/><g fill="#dfe8f2"><rect x="10" y="30" width="16" height="26"/><rect x="88" y="26" width="18" height="30"/></g><rect x="46" y="10" width="22" height="46" fill="#a9cbe8"/><g fill="#eef3f7"><rect x="49" y="14" width="16" height="2"/><rect x="49" y="22" width="16" height="2"/><rect x="49" y="30" width="16" height="2"/><rect x="49" y="38" width="16" height="2"/></g><rect x="28" y="36" width="16" height="20" fill="#f4e3c8"/><path d="M27 37l9-8 9 8z" fill="#b0503a"/><rect x="70" y="40" width="16" height="16" fill="#f6dcd2"/><rect x="0" y="56" width="120" height="8" fill="#62666e"/><g fill="#fff"><rect x="8" y="59" width="10" height="2"/><rect x="40" y="59" width="10" height="2"/><rect x="72" y="59" width="10" height="2"/><rect x="104" y="59" width="10" height="2"/></g><circle cx="34" cy="50" r="5" fill="#4f9a45"/></svg>',
+  cyber: '<svg viewBox="0 0 120 64"><defs><linearGradient id="cs" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#090a26"/><stop offset="1" stop-color="#4a1b6e"/></linearGradient></defs><rect width="120" height="64" fill="url(#cs)"/><circle cx="60" cy="40" r="16" fill="#ff4fd8" opacity=".55"/><g fill="#141826"><rect x="6" y="20" width="14" height="44"/><rect x="24" y="30" width="12" height="34"/><rect x="50" y="8" width="18" height="56"/><rect x="74" y="24" width="12" height="40"/><rect x="92" y="14" width="16" height="50"/></g><g fill="#3ef0ff"><rect x="6" y="20" width="14" height="1.5"/><rect x="50" y="8" width="18" height="1.5"/><rect x="92" y="14" width="16" height="1.5"/><rect x="58" y="0" width="2" height="8" opacity=".7"/></g><g fill="#ff4fd8"><rect x="24" y="30" width="12" height="1.5"/><rect x="74" y="24" width="12" height="1.5"/></g><g fill="#ffe28a" opacity=".85"><rect x="10" y="28" width="2" height="2"/><rect x="54" y="18" width="2" height="2"/><rect x="62" y="30" width="2" height="2"/><rect x="96" y="24" width="2" height="2"/><rect x="100" y="40" width="2" height="2"/><rect x="28" y="40" width="2" height="2"/></g><rect x="0" y="60" width="120" height="1.5" fill="#3ef0ff"/></svg>'
+};
+{
+  const pick = $('.world-pick');
+  pick.innerHTML = Object.entries(WORLDS).map(([id, w]) => `
+    <button type="button" class="world-card" role="radio" aria-checked="${id === WORLD_ID}" data-world="${id}">
+      <span class="wc-art" aria-hidden="true">${WORLD_ART[id] || ''}</span>
+      <span class="wc-text"><i>${esc(w.tag || '')}</i><b>${esc(w.label || id)}</b><small>${esc(w.desc || '')}</small></span>
+    </button>`).join('');
+  pick.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-world]');
+    if (b && b.dataset.world !== WORLD_ID) switchWorld(b.dataset.world);
+  });
+  $('#intro-lore').innerHTML = WD.lore || ''; // 文字來自本站的 data/worlds.js
+  $('#complete-title').textContent = `${WD.land || '大陸'}已走遍`;
+}
+function switchWorld(id) {
+  try { localStorage.setItem(WORLD_KEY, id); } catch (e) { /* 存不了就只換這一次 */ }
+  const u = new URL(location.href); u.searchParams.set('world', id); u.hash = '';
+  document.body.classList.add('switching');
+  location.href = u.href;
+}
+$('#btn-world').addEventListener('click', () => { const u = new URL(location.href); u.hash = ''; location.href = u.href; });
 $('#btn-start').addEventListener('click', () => {
+  try { localStorage.setItem(WORLD_KEY, WORLD_ID); } catch (e) { /* 無法記住也沒關係 */ }
   $('#intro').hidden = true;
   state.started = true;
   sound.resumeIfWanted();

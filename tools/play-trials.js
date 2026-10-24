@@ -4,6 +4,7 @@
  * 用法：node tools/play-trials.js            （桌機尺寸）
  *       MOBILE=1 node tools/play-trials.js   （手機尺寸）
  *       ONLY=hsu-hao,chen-nien-tsu node tools/play-trials.js   （只測指定老師）
+ *       WORLD=cyber node tools/play-trials.js   （指定世界觀）
  * 教室空氣那關是 45 秒的即時模擬，沒有 GPU 的環境會跑比較久。
  */
 const { spawn, execSync } = require('child_process');
@@ -26,7 +27,7 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null; // 預設：
   const b = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
   const p = await b.newPage(mobile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1200, height: 800 } });
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => m.type()==='error' && errs.push(m.text()));
-  await p.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await p.goto(`http://localhost:${PORT}/${process.env.WORLD ? '?world=' + process.env.WORLD : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await p.waitForSelector('#loading.done', { state: 'attached', timeout: 240000 });
   await p.evaluate(() => localStorage.clear()); await p.reload({ waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#loading.done', { state: 'attached', timeout: 240000 });

@@ -6,6 +6,7 @@
  *       MODE=3d node tools/play-fights.js    （桌機：正常版 3D 採集場，軟體繪圖會比較慢）
  *       MOBILE=1 node tools/play-fights.js   （手機尺寸：2D 小視窗與觸控按鈕）
  *       ONLY=hsu-hao,chen-nien-tsu node tools/play-fights.js   （只測指定老師）
+ *       WORLD=modern node tools/play-fights.js  （指定世界觀：fantasy／modern／cyber）
  */
 const { spawn, execSync } = require('child_process');
 const path = require('path');
@@ -29,7 +30,7 @@ const MODE = process.env.MODE === '3d' ? '3d' : '2d';
   const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
   let fails = 0;
   try {
-    await p.goto(`http://localhost:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await p.goto(`http://localhost:${PORT}/${process.env.WORLD ? '?world=' + process.env.WORLD : ''}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
     await p.waitForSelector('#loading.done', { state: 'attached', timeout: 240000 });
     // 所有導師都先進入「採集中」
     await p.evaluate(() => {
@@ -40,7 +41,7 @@ const MODE = process.env.MODE === '3d' ? '3d' : '2d';
     await p.waitForSelector('#loading.done', { state: 'attached', timeout: 240000 });
     await p.click('#btn-start'); await p.waitForTimeout(500);
     const ids = ONLY || await p.evaluate(() => Object.keys(window.QUESTS.teachers));
-    const tag = mobile ? 'm' : MODE === '3d' ? '3d' : 'd';
+    const tag = (process.env.WORLD ? process.env.WORLD[0] : '') + (mobile ? 'm' : MODE === '3d' ? '3d' : 'd');
     for (const id of ids) {
       const type = await p.evaluate((id) => window.QUESTS.teachers[id].stage1.game.type, id);
       // 1. 快速模擬

@@ -9,8 +9,8 @@
  * 小遊戲以 registerTrial(類型, 函式) 註冊；尚未註冊的試煉會顯示「製作中」。
  * ========================================================================= */
 import * as THREE from 'three';
-import { createArena, draw2D } from './fight.js?v=1';
-import { createFight3D } from './fight3d.js?v=1';
+import { createArena, draw2D } from './fight.js?v=2';
+import { createFight3D } from './fight3d.js?v=2';
 
 export const QUEST_KEY = 'tutIdQuest.quests.v1';
 const GAMES = {};
@@ -18,6 +18,7 @@ const GAMES = {};
 export function registerTrial(type, fn) { GAMES[type] = fn; }
 
 const STAGE = { NEW: 0, COLLECT: 1, TRIAL: 2, DONE: 3 };
+const WORLD = document.documentElement.dataset.world || 'fantasy'; // 開場選的世界觀（main.js 設定）
 const DEV = new URLSearchParams(location.search).has('dev'); // ?dev 才會出現「直接通過」測試鈕
 
 export function initQuests(api) {
@@ -86,6 +87,38 @@ export function initQuests(api) {
     }
   };
 
+  /* 依世界換造型：現代戴棒球帽、穿球鞋，精靈變成無人機；未來是霓虹發光、外框線與天線 */
+  const TOP = { blob: 1.25, cube: 1.5, sprite: 2.15, cloud: 1.9, golem: 2.0, bug: 0.95 };
+  function skin(g, shape, c) {
+    if (WORLD === 'modern') {
+      if (shape === 'sprite') {
+        g.children.forEach((o) => { if (o.userData.wing) o.visible = false; });
+        for (const [x, z] of [[-0.7, -0.4], [0.7, -0.4], [-0.7, 0.4], [0.7, 0.4]]) {
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.08), mat('#3b4048')); arm.position.set(x * 0.6, 1.95, z * 0.6); arm.rotation.y = Math.atan2(z, x); g.add(arm);
+          const rotor = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.03, 12), mat('#dfe6ee', { transparent: true, opacity: 0.7 })); rotor.position.set(x, 2.0, z); rotor.userData.rotor = true; g.add(rotor);
+        }
+        return;
+      }
+      if (shape === 'bug') return;
+      const y = TOP[shape], capM = mat(['#e5484d', '#2f6fbf', '#f2c230'][c.length % 3]);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), capM); cap.position.y = y - 0.12; g.add(cap);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.4), capM); brim.position.set(0, y - 0.1, 0.45); g.add(brim);
+      if (shape === 'blob' || shape === 'golem') for (const sx of [-0.35, 0.35]) { const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.5), mat('#ffffff')); shoe.position.set(sx, 0.08, 0.12); g.add(shoe); }
+    } else if (WORLD === 'cyber') {
+      const neon = mat(c, { emissive: c, emissiveIntensity: 0.55 });
+      const edge = new THREE.LineBasicMaterial({ color: '#3ef0ff', transparent: true, opacity: 0.75 });
+      g.traverse((o) => {
+        if (!o.isMesh || !o.material.color || o.material.color.getHexString() !== new THREE.Color(c).getHexString()) return;
+        o.material = o.material.transparent ? mat(c, { emissive: c, emissiveIntensity: 0.55, transparent: true, opacity: o.material.opacity }) : neon;
+        if (o.geometry.attributes.position.count < 400) o.add(new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), edge));
+      });
+      const y = TOP[shape];
+      const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4), mat('#1b1e2c')); ant.position.set(0.2, y + 0.2, 0); g.add(ant);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), mat('#ff4fd8', { emissive: '#ff4fd8', emissiveIntensity: 2 })); tip.position.set(0.2, y + 0.52, 0); tip.userData.blink = true; g.add(tip);
+    }
+  }
+  const SKINNED = Object.fromEntries(Object.entries(SHAPES).map(([k, fn]) => [k, (g, c) => { const b = fn(g, c); skin(g, k, c); return b; }]));
+
   /* 小怪的局部動畫（方塊環繞、翅膀、手臂、腳），閒晃小怪與採集戰共用 */
   function animateMon(g, t) {
     g.children.forEach((c) => {
@@ -93,6 +126,8 @@ export function initQuests(api) {
       if (c.userData.wing) c.rotation.y = c.userData.wing * (0.4 + Math.sin(t * 18) * 0.5);
       if (c.userData.arm) c.rotation.x = Math.sin(t * 4 + c.userData.arm) * 0.5;
       if (c.userData.leg !== undefined) c.rotation.x = Math.sin(t * 14 + c.userData.leg * 2) * 0.4;
+      if (c.userData.rotor) c.rotation.y = t * 25;
+      if (c.userData.blink) c.visible = Math.sin(t * 6) > -0.3;
     });
   }
 
@@ -113,7 +148,7 @@ export function initQuests(api) {
     if (fight && fieldOf(fight.f) === fd) return; // 這塊採集場正在打採集戰，場上由採集戰接手
     for (let k = 0; k < 3; k++) {
       const g = new THREE.Group();
-      const body = (SHAPES[q.stage1.monster.shape] || SHAPES.blob)(g, q.stage1.monster.color || regionOf(f).color);
+      const body = (SKINNED[q.stage1.monster.shape] || SKINNED.blob)(g, q.stage1.monster.color || regionOf(f).color);
       const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * (FIELD_R - 3);
       const x = fd.x + Math.cos(a) * d, z = fd.z + Math.sin(a) * d;
       g.position.set(x, heightAt(x, z), z); scene.add(g);
@@ -237,7 +272,7 @@ export function initQuests(api) {
   function newArena(f, hard) {
     const q = qOf(f);
     return createArena({
-      type: gameOf(f).type, hard, need: need(), monster: q.stage1.monster, item: q.stage1.item, color: regionOf(f).color,
+      type: gameOf(f).type, hard, need: need(), world: WORLD, monster: q.stage1.monster, item: q.stage1.item, color: regionOf(f).color,
       sfx: (n) => sound.sfx(n), onEnd: (E) => setTimeout(() => endFight(E), E.result === 'win' ? 700 : 900)
     });
   }
@@ -345,7 +380,7 @@ export function initQuests(api) {
     const P = E.P, wx = fd.x + P.x, wz = fd.z + P.z;
     api.teleport(wx, wz, Math.atan2(-Math.sin(P.face), -Math.cos(P.face)));
     const input = { mx: 0, mz: 0 };
-    const r3 = createFight3D({ scene, camera, player, heightAt, mat, SHAPES, animateMon, origin: { x: fd.x, z: fd.z }, E });
+    const r3 = createFight3D({ scene, camera, player, heightAt, mat, SHAPES: SKINNED, animateMon, origin: { x: fd.x, z: fd.z }, E });
     state.moveHook = (mx, mz) => { input.mx = mx; input.mz = mz; return E.P.moving; };
     hudEl.style.setProperty('--region', regionOf(f).color);
     hudEl.querySelector('.fh').innerHTML = hudHTML(f);
