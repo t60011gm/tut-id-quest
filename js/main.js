@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=6';
 import { installTrials } from './trials.js?v=3';
 import { MODERN_BUILDERS } from './world-modern.js?v=3';
-import { CYBER_BUILDERS } from './world-cyber.js?v=2';
+import { CYBER_BUILDERS } from './world-cyber.js?v=3';
 
 const W = window.WORLD;
 
@@ -2977,9 +2977,25 @@ const nightGlows = (() => {
   return arr.map((m, i) => (a[i] === b[i] && b[i] === c[i] ? { m, day: m.userData.day ?? a[i] * DN.dayK, night: m.userData.night ?? a[i] * DN.boost } : null)).filter(Boolean);
 })();
 
-/* 小地圖角落的時鐘 */
-const clockEl = $('#clock');
+/* 小地圖角落的時鐘、白天／夜晚快速切換，與點時鐘打開的「調整時間」面板（以小時為單位） */
+const clockEl = $('#clock'), dnBtn = $('#btn-daynight'), tPanel = $('#time-panel'), tRange = $('#tp-range'), tNow = $('#tp-now');
 let clockText = '';
+function syncTimePanel() {
+  const h = Math.floor(hourNow()) % 24;
+  if (document.activeElement !== tRange) tRange.value = h;
+  tNow.textContent = `${h} 時`;
+}
+function jumpTo(h) { setHour(h); dayFactors(); syncTimePanel(); }
+function toggleTimePanel(open = tPanel.hidden) {
+  tPanel.hidden = !open; clockEl.setAttribute('aria-expanded', String(open));
+  if (open) syncTimePanel();
+}
+clockEl.addEventListener('click', (e) => { e.stopPropagation(); toggleTimePanel(); });
+tRange.addEventListener('input', () => { setHour(+tRange.value); tNow.textContent = `${tRange.value} 時`; });
+tPanel.addEventListener('click', (e) => { e.stopPropagation(); const b = e.target.closest('[data-h]'); if (b) jumpTo(+b.dataset.h); });
+dnBtn.addEventListener('click', (e) => { e.stopPropagation(); jumpTo(dn.night > 0.3 || dn.hour < 6 || dn.hour >= 18 ? 12 : 21); }); // 白天切到晚上 9 點、晚上切到中午
+document.addEventListener('click', (e) => { if (!tPanel.hidden && !tPanel.contains(e.target)) toggleTimePanel(false); });
+window.addEventListener('keydown', (e) => { if (e.code === 'Escape' && !tPanel.hidden) { toggleTimePanel(false); e.stopImmediatePropagation(); } }, true);
 const sunDir = new THREE.Vector3();
 function updateDayNight(t) {
   dayFactors();
@@ -3000,7 +3016,12 @@ function updateDayNight(t) {
   renderer.toneMappingExposure = EV.exposure * (1 + n * 0.18);
   const hh = Math.floor(dn.hour), mm = Math.floor((dn.hour - hh) * 60);
   const label = `${dn.night > 0.5 ? '夜晚' : dn.dusk > 0.5 ? (dn.hour < 12 ? '清晨' : '黃昏') : '白天'} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-  if (label !== clockText) { clockText = label; clockEl.textContent = label; clockEl.dataset.phase = dn.night > 0.5 ? 'night' : 'day'; }
+  if (label !== clockText) {
+    clockText = label; clockEl.textContent = label; clockEl.dataset.phase = dn.night > 0.5 ? 'night' : 'day';
+    const nightNow = dn.night > 0.3 || dn.hour < 6 || dn.hour >= 18;
+    dnBtn.classList.toggle('night', nightNow); dnBtn.setAttribute('aria-label', nightNow ? '切換成白天' : '切換成夜晚');
+    if (!tPanel.hidden) syncTimePanel();
+  }
 }
 
 /* 任務系統（js/quests.js）：在合併靜態模型之後建立，小怪才不會被合併 */

@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
 <script>
@@ -78,7 +78,18 @@
 <figure id="minimap-wrap" class="plate" style="margin:0">
   <canvas id="minimap" width="336" height="336" aria-label="小地圖，點擊區域可前往"></canvas>
   <figcaption>點擊小地圖快速前往</figcaption>
-  <span id="clock" class="clock" title="遊戲時間：現實 1 小時＝遊戲 1 天"></span>
+  <button id="clock" class="clock" type="button" aria-expanded="false" aria-controls="time-panel" title="遊戲時間（現實 1 小時＝遊戲 1 天），點一下調整"></button>
+  <button id="btn-daynight" class="icon-btn" type="button" aria-label="切換成夜晚">
+    <svg class="ic-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+    <svg class="ic-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>
+  </button>
+  <div id="time-panel" class="plate" hidden>
+    <div class="tp-head"><b>調整時間</b><span id="tp-now">12 時</span></div>
+    <input type="range" id="tp-range" min="0" max="23" step="1" value="12" aria-label="一天中的時刻（小時）">
+    <div class="tp-ticks" aria-hidden="true"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+    <div class="tp-btns"><button type="button" data-h="12">白天</button><button type="button" data-h="18">黃昏</button><button type="button" data-h="21">夜晚</button></div>
+    <p class="tp-note">設定後時間會繼續流動（現實 1 小時＝遊戲 1 天）</p>
+  </div>
   <button id="btn-sound" class="icon-btn sound-btn" type="button" aria-pressed="false" aria-label="開啟音效">
     <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l4 6M21 9l-4 6"/></svg>
     <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
@@ -208,6 +219,6 @@
 }
 </script>
 <!-- 更新 css/js 後把 ?v= 的數字加一，避免訪客瀏覽器讀到快取的舊檔 -->
-<script type="module" src="js/main.js?v=16"></script>
+<script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>

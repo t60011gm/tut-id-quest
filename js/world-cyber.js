@@ -17,14 +17,39 @@ function boxGeo(K, w, h, d, unit = 3) {
 }
 const NEON = ['#3ef0ff', '#ff4fd8', '#ffd23e', '#7c5cff', '#4dffb0'];
 /* 夜間大樓窗格：深色牆面，零星亮著青、紫、黃的窗 */
+/* 建築外牆：淺灰混凝土板＋藍灰玻璃窗帶，窗框是金屬條 */
 const windowTex = (K) => ctex(K, 'cyberwin', 64, 64, (c, w, h) => {
-  c.fillStyle = '#141826'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#c4c7cc'; c.fillRect(0, 0, w, h);
+  for (let k = 0; k < 60; k++) { const v = 180 + (k * 37) % 40; c.fillStyle = `rgba(${v},${v},${v + 4},.5)`; c.fillRect((k * 23) % w, (k * 41) % h, 2, 2); }
+  c.fillStyle = '#9a9ea6'; c.fillRect(0, 31, w, 1); c.fillRect(31, 0, 1, h); // 板縫
+  for (let y = 4; y < h; y += 10) for (let x = 4; x < w; x += 10) { c.fillStyle = '#4a5d7e'; c.fillRect(x, y, 6, 5); c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x, y, 6, 1); }
+});
+/* 窗戶的發光貼圖（與外牆窗格對齊）：亮著青、粉、黃、紫的窗，其餘不發光 */
+const windowLitTex = (K) => ctex(K, 'cyberwinlit', 64, 64, (c, w, h) => {
+  c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
   for (let y = 4; y < h; y += 10) for (let x = 4; x < w; x += 10) {
     const k = (x * 13 + y * 7) % 11;
-    c.fillStyle = k < 4 ? ['#3ef0ff', '#ff7ae0', '#ffe28a', '#b9a8ff'][k] : '#222a3e';
+    c.fillStyle = k < 5 ? ['#3ef0ff', '#ff7ae0', '#ffe28a', '#b9a8ff', '#9fe8ff'][k] : '#10161f';
     c.fillRect(x, y, 6, 5);
   }
 });
+/* 拉絲金屬板：直向細紋、板縫與鉚釘 */
+const metalTex = (K) => ctex(K, 'metal', 64, 64, (c, w, h) => {
+  c.fillStyle = '#d8dce2'; c.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x++) { const v = 200 + ((x * 29) % 37); c.fillStyle = `rgba(${v},${v + 3},${v + 8},.55)`; c.fillRect(x, 0, 1, h); }
+  c.fillStyle = '#8f96a2'; c.fillRect(0, 31, w, 2); c.fillRect(31, 0, 2, h);
+  c.fillStyle = '#a7aeb9'; for (const [x, y] of [[4, 4], [27, 4], [4, 27], [27, 27], [36, 36], [59, 36], [36, 59], [59, 59]]) { c.beginPath(); c.arc(x, y, 1.6, 0, Math.PI * 2); c.fill(); }
+});
+/* 清水混凝土：斑點與模板孔 */
+const concreteTex = (K) => ctex(K, 'concrete', 64, 64, (c, w, h) => {
+  c.fillStyle = '#d4d4d0'; c.fillRect(0, 0, w, h);
+  for (let k = 0; k < 140; k++) { const v = 170 + (k * 53) % 70; c.fillStyle = `rgba(${v},${v},${v - 4},.6)`; c.fillRect((k * 31) % w, (k * 17 + k * k) % h, 2, 2); }
+  c.fillStyle = '#a9aaa6'; c.fillRect(0, 31, w, 1); c.fillRect(31, 0, 1, h);
+  c.fillStyle = '#9c9d99'; for (const [x, y] of [[10, 10], [52, 10], [10, 52], [52, 52]]) { c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill(); }
+});
+/* 科幻建築材質：金屬（偏冷灰藍）與混凝土（暖灰），不用全黑 */
+const metal = (K, c = '#a3acbb', o = {}) => K.mat(c, { map: metalTex(K), ...o });
+const concrete = (K, c = '#b9bab8') => K.mat(c, { map: concreteTex(K) });
 /* 霓虹招牌文字 */
 function neonSign(K, text, color, w = 160) {
   return ctex(K, 'neon:' + text + color, w, 56, (c, cw, ch) => {
@@ -41,21 +66,21 @@ const noShadow = (m) => { m.castShadow = false; return m; };
 /* 共用小物件 */
 function neonPylon(K, g, u, v, y, c) {
   const { THREE, mesh, mat } = K;
-  mesh(new THREE.BoxGeometry(0.22, 3.6, 0.22), mat('#1b1e2c'), u, y + 1.8, v, g);
+  mesh(new THREE.BoxGeometry(0.22, 3.6, 0.22), metal(K), u, y + 1.8, v, g);
   noShadow(mesh(new THREE.BoxGeometry(0.08, 3.2, 0.26), glow(K, c), u, y + 1.8, v, g));
   noShadow(mesh(new THREE.OctahedronGeometry(0.22), glow(K, c, 2), u, y + 3.8, v, g));
   K.addLight(g, u, y + 3.8, v, c, { pool: 4 });
 }
 /* 大樓窗格材質：白天只微微發亮，夜裡全亮 */
 function windowMat(K) {
-  const m = K.mat('#ffffff', { map: windowTex(K), emissiveMap: windowTex(K), emissive: '#ffffff', emissiveIntensity: 0.9 });
-  m.userData.day = 0.3; m.userData.night = 1.3;
+  const m = K.mat('#ffffff', { map: windowTex(K), emissiveMap: windowLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.9 });
+  m.userData.day = 0.12; m.userData.night = 1.4;
   return m;
 }
 function tower(K, g, u, v, y, w, h, d, c, unit = 3) {
   const { THREE, mesh, mat } = K;
   mesh(boxGeo(K, w, h, d, unit), windowMat(K), u, y + h / 2, v, g);
-  mesh(new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2), mat('#1b1e2c'), u, y + h + 0.15, v, g);
+  mesh(new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2), metal(K), u, y + h + 0.15, v, g);
   for (const [x, z, L, rot] of [[0, d / 2 + 0.06, w, 0], [0, -d / 2 - 0.06, w, 0], [w / 2 + 0.06, 0, d, Math.PI / 2], [-w / 2 - 0.06, 0, d, Math.PI / 2]]) {
     const e = noShadow(mesh(new THREE.BoxGeometry(L, 0.12, 0.08), glow(K, c), u + x, y + h + 0.32, v + z, g)); e.rotation.y = rot;
   }
@@ -91,7 +116,7 @@ export const CYBER_BUILDERS = {
     const { THREE, mesh, mat, animators, camNear, hash2, sparkles } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 44, '#ff4fd8');
-    mesh(new THREE.CylinderGeometry(15.5, 16.5, 0.8, 8), mat('#1b1e2c'), 0, 0.2, 0, g);
+    mesh(new THREE.CylinderGeometry(15.5, 16.5, 0.8, 8), metal(K), 0, 0.2, 0, g);
     // 巨塔：三段退縮
     tower(K, g, 0, -3, 0, 10, 12, 10, '#ff4fd8', 3.4);
     tower(K, g, 0, -3, 12.3, 7.5, 10, 7.5, '#3ef0ff', 3.4);
@@ -118,7 +143,7 @@ export const CYBER_BUILDERS = {
       c.fillStyle = '#3ef0ff'; c.font = '900 30px sans-serif'; c.textAlign = 'center'; c.fillText('DESIGN NEXUS', w / 2, h * 0.42);
       c.fillStyle = '#ffffff'; c.font = '700 18px sans-serif'; c.fillText(`ONLINE · ${String(Math.floor(time * 7) % 1000).padStart(3, '0')} NODES`, w / 2, h * 0.72);
     });
-    for (const sx of [-3.6, 3.6]) mesh(new THREE.BoxGeometry(0.2, 9, 0.2), mat('#1b1e2c'), sx, 4.5, 6, g);
+    for (const sx of [-3.6, 3.6]) mesh(new THREE.BoxGeometry(0.2, 9, 0.2), metal(K), sx, 4.5, 6, g);
     col(-3.6, 6, 0.4); col(3.6, 6, 0.4);
     // 環狀廣場的霓虹柱
     for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + 0.3, u = Math.cos(a) * 15.5, v = Math.sin(a) * 15.5; if (v > 8 && Math.abs(u) < 7) continue; neonPylon(K, g, u, v, ly(u, v), NEON[k % 3]); col(u, v, 0.4); }
@@ -148,7 +173,7 @@ export const CYBER_BUILDERS = {
       const a = hash2(k, 4.4) * Math.PI * 2, d = 7 + hash2(k, 2.2) * 12, u = Math.cos(a) * d, v = Math.sin(a) * d;
       if (!clear(u, v, 3)) continue;
       const h = 8 + hash2(k, 1.1) * 10, y = ly(u, v);
-      mesh(new THREE.CylinderGeometry(0.5, 1.1, h, 6), mat('#141826'), u, y + h / 2, v, g);
+      mesh(new THREE.CylinderGeometry(0.5, 1.1, h, 6), metal(K, '#8a94a6'), u, y + h / 2, v, g);
       const st = streamTex.clone(); st.needsUpdate = true; st.repeat.set(2, h / 8);
       const s = noShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.56, 1.16, h, 6, 1, true), new THREE.MeshBasicMaterial({ map: st, color: n % 2 ? '#7c5cff' : '#3ef0ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
       s.position.set(u, y + h / 2, v); g.add(s); spires.push(st);
@@ -157,7 +182,7 @@ export const CYBER_BUILDERS = {
     }
     // 中央神經核心：三層神經元
     const core = new THREE.Group(); core.position.set(0, 0, -2); g.add(core);
-    mesh(new THREE.CylinderGeometry(2.4, 3, 1.2, 8), mat('#1b1e2c'), 0, 0.6, 0, core);
+    mesh(new THREE.CylinderGeometry(2.4, 3, 1.2, 8), metal(K), 0, 0.6, 0, core);
     const orb = noShadow(mesh(new THREE.IcosahedronGeometry(2, 1), holoMat(K, '#3ef0ff', 0.35), 0, 6, 0, core));
     const inner = noShadow(mesh(new THREE.IcosahedronGeometry(1.1, 0), glow(K, '#7c5cff', 2), 0, 6, 0, core));
     K.dyn(orb); K.dyn(inner);
@@ -184,9 +209,9 @@ export const CYBER_BUILDERS = {
     const fans = [];
     for (const [u, v, h] of [[-9, -6, 16], [9, -6, 13], [0, -13, 19]]) {
       const y = ly(u, v), tw = new THREE.Group(); tw.position.set(u, y, v); g.add(tw);
-      mesh(new THREE.CylinderGeometry(2.6, 3.4, h, 12), mat('#22283a'), 0, h / 2, 0, tw);
+      mesh(new THREE.CylinderGeometry(2.6, 3.4, h, 12), concrete(K, '#aeb0b2'), 0, h / 2, 0, tw);
       for (let k = 1; k < 4; k++) noShadow(mesh(new THREE.TorusGeometry(2.7 + 0.25 * (1 - k / 4), 0.08, 4, 32), glow(K, '#4dffb0'), 0, h * k / 4, 0, tw)).rotation.x = Math.PI / 2;
-      mesh(new THREE.CylinderGeometry(2.9, 2.6, 1.2, 16, 1, true), mat('#1b1e2c', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
+      mesh(new THREE.CylinderGeometry(2.9, 2.6, 1.2, 16, 1, true), metal(K, '#8e98a8', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
       const fan = K.dyn(new THREE.Group()); fan.position.y = h + 0.8; tw.add(fan);
       for (let k = 0; k < 5; k++) { const b = mesh(new THREE.BoxGeometry(2.4, 0.08, 0.6), mat('#8a93ad'), 1.2, 0, 0, new THREE.Group()); const arm = b.parent; arm.rotation.y = k * Math.PI * 2 / 5; b.rotation.x = 0.4; fan.add(arm); }
       sparkles(tw, 40, '#9dffd0', 2.2, h + 1, h + 12, 0.5, 2.2);
@@ -194,7 +219,7 @@ export const CYBER_BUILDERS = {
     }
     // 生態穹頂：網格玻璃罩著一片綠地
     const dome = new THREE.Group(); dome.position.set(0, ly(0, 2), 2); g.add(dome);
-    mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.5, 24), mat('#1b1e2c'), 0, 0.25, 0, dome);
+    mesh(new THREE.CylinderGeometry(4.6, 4.8, 0.5, 24), metal(K), 0, 0.25, 0, dome);
     mesh(new THREE.CylinderGeometry(4.3, 4.3, 0.2, 24), mat('#2f8a5a'), 0, 0.55, 0, dome);
     for (let k = 0; k < 7; k++) { const a = k * 0.9; mesh(new THREE.IcosahedronGeometry(0.6 + (k % 3) * 0.2, 0), mat('#3fbf6a'), Math.cos(a) * 2.4, 1.3, Math.sin(a) * 2.4, dome); }
     noShadow(mesh(new THREE.SphereGeometry(4.4, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), holoMat(K, '#4dffb0', 0.12), 0, 0.5, 0, dome));
@@ -211,7 +236,7 @@ export const CYBER_BUILDERS = {
       });
     }, 4);
     // 回收管線
-    for (const [u, rot] of [[-5, 0.2], [5, -0.2]]) { const p = mesh(new THREE.CylinderGeometry(0.35, 0.35, 10, 10), mat('#3a4258'), u, ly(u, -6) + 1, -6, g); p.rotation.set(Math.PI / 2, 0, rot); }
+    for (const [u, rot] of [[-5, 0.2], [5, -0.2]]) { const p = mesh(new THREE.CylinderGeometry(0.35, 0.35, 10, 10), metal(K, '#9099a8'), u, ly(u, -6) + 1, -6, g); p.rotation.set(Math.PI / 2, 0, rot); }
     animators.push((t, dt) => {
       fans.forEach((f, i) => { f.rotation.y += dt * (2.5 + i * 0.4); });
       if (!camNear(r)) return;
@@ -229,18 +254,18 @@ export const CYBER_BUILDERS = {
     hazard.repeat.set(6, 1);
     noShadow(mesh(new THREE.PlaneGeometry(16, 0.8), mat('#ffffff', { map: hazard }), 0, 0.5, -4.98, g));
     noShadow(mesh(new THREE.PlaneGeometry(6, 1.8), mat('#ffffff', { map: neonSign(K, 'FAB-07', '#ff9a3c'), emissiveMap: neonSign(K, 'FAB-07', '#ff9a3c'), emissive: '#ffffff', emissiveIntensity: 1 }), 0, 6, -4.97, g));
-    for (let k = 0; k < 3; k++) mesh(new THREE.CylinderGeometry(0.6, 0.8, 5, 10), mat('#2a2f42'), -5 + k * 5, 9.5, -11, g);
+    for (let k = 0; k < 3; k++) mesh(new THREE.CylinderGeometry(0.6, 0.8, 5, 10), concrete(K), -5 + k * 5, 9.5, -11, g);
     col(-5, -9, 4.6); col(0, -9, 4.6); col(5, -9, 4.6);
     // 輸送帶：箱子不停往前送
     const belt = new THREE.Group(); belt.position.set(0, ly(0, -2), -2); g.add(belt);
-    mesh(new THREE.BoxGeometry(14, 0.6, 1.6), mat('#2a2f42'), 0, 0.8, 0, belt);
+    mesh(new THREE.BoxGeometry(14, 0.6, 1.6), concrete(K), 0, 0.8, 0, belt);
     noShadow(mesh(new THREE.BoxGeometry(14, 0.05, 1.7), glow(K, '#ff9a3c', 1), 0, 0.5, 0, belt));
     const boxes = [0, 1, 2, 3, 4].map((i) => K.dyn(mesh(new THREE.BoxGeometry(0.9, 0.7, 0.9), mat(i % 2 ? '#c8945a' : '#3ef0ff'), 0, 1.45, 0, belt)));
     col(-4, -2, 1); col(0, -2, 1); col(4, -2, 1);
     // 兩支機械手臂
     const arms = [-1, 1].map((sx) => {
       const base = new THREE.Group(); base.position.set(sx * 3, ly(sx * 3, 0.5), 0.5); g.add(base);
-      mesh(new THREE.CylinderGeometry(0.8, 1, 0.6, 12), mat('#2a2f42'), 0, 0.3, 0, base);
+      mesh(new THREE.CylinderGeometry(0.8, 1, 0.6, 12), concrete(K), 0, 0.3, 0, base);
       const a0 = K.dyn(new THREE.Group()); a0.position.y = 0.6; base.add(a0);
       const a1 = new THREE.Group(); a1.position.y = 0.2; a0.add(a1);
       mesh(new THREE.BoxGeometry(0.4, 2.6, 0.4), mat('#ff9a3c'), 0, 1.3, 0, a1);
@@ -285,10 +310,10 @@ export const CYBER_BUILDERS = {
     stalls.forEach(([name, c], i) => {
       const row = i < 3 ? -1 : 1, k = i % 3, u = -8 + k * 8, v = row < 0 ? -3 : 4;
       const st = new THREE.Group(); st.position.set(u, ly(u, v), v); st.rotation.y = row < 0 ? 0 : Math.PI; g.add(st);
-      mesh(new THREE.BoxGeometry(4, 1, 2), mat('#2a2f42'), 0, 0.5, 0, st);
+      mesh(new THREE.BoxGeometry(4, 1, 2), concrete(K), 0, 0.5, 0, st);
       noShadow(mesh(new THREE.BoxGeometry(4.05, 0.08, 2.05), glow(K, c, 1.2), 0, 1.02, 0, st));
-      for (const sx of [-1.9, 1.9]) mesh(new THREE.BoxGeometry(0.12, 3, 0.12), mat('#1b1e2c'), sx, 1.5, -0.9, st);
-      mesh(new THREE.BoxGeometry(4.2, 0.15, 2.4), mat('#1b1e2c'), 0, 3, -0.2, st);
+      for (const sx of [-1.9, 1.9]) mesh(new THREE.BoxGeometry(0.12, 3, 0.12), metal(K), sx, 1.5, -0.9, st);
+      mesh(new THREE.BoxGeometry(4.2, 0.15, 2.4), metal(K), 0, 3, -0.2, st);
       const nt = neonSign(K, name, c, 128);
       noShadow(mesh(new THREE.PlaneGeometry(2.2, 0.95), mat('#ffffff', { map: nt, emissiveMap: nt, emissive: '#ffffff', emissiveIntensity: 1.1 }), 0, 3.6, 0, st));
       if (name === '拉麵') sparkles(st, 20, '#ffffff', 0.6, 1.1, 3, 0.4, 0.8);
@@ -327,7 +352,7 @@ export const CYBER_BUILDERS = {
       const s = new THREE.Group(); s.position.set(u, ly(u, v) + y, v); g.add(s);
       s.add(noShadow(new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: c }))));
       s.add(noShadow(new THREE.Mesh(geo, holoMat(K, c, 0.18))));
-      mesh(new THREE.CylinderGeometry(1.4, 1.8, 1, 8), mat('#1b1e2c'), u, ly(u, v) + 0.5, v, g);
+      mesh(new THREE.CylinderGeometry(1.4, 1.8, 1, 8), metal(K), u, ly(u, v) + 0.5, v, g);
       const ped = noShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 1.2, y - 1, 12, 1, true), holoMat(K, c, 0.15))); ped.position.set(u, ly(u, v) + 1 + (y - 1) / 2, v); g.add(ped);
       col(u, v, 1.8);
       return s;
@@ -343,13 +368,13 @@ export const CYBER_BUILDERS = {
       c.strokeStyle = bc; c.lineWidth = 6; c.beginPath(); c.arc(w * 0.28, h / 2, h * 0.26, 0, Math.PI * 2); c.stroke();
       c.fillStyle = bc; c.font = '900 30px sans-serif'; c.fillText(['TUT·ID', 'ECO', 'BRAND'][k], w * 0.48, h / 2 + 10);
     });
-    mesh(new THREE.BoxGeometry(0.3, 4.5, 0.3), mat('#1b1e2c'), -11, ly(-11, 4) + 2.25, 4, g); col(-11, 4, 0.5);
+    mesh(new THREE.BoxGeometry(0.3, 4.5, 0.3), metal(K), -11, ly(-11, 4) + 2.25, 4, g); col(-11, 4, 0.5);
     // 風格色票牆（室內美學）
     const swatch = ctex(K, 'swatch', 128, 64, (c, w, h) => {
       ['#e8d3a8', '#6b6b6b', '#9fb57a', '#c9a227', '#c77dff', '#3ef0ff', '#ff4fd8', '#f4efe6'].forEach((cc, i) => { c.fillStyle = cc; c.fillRect((i % 4) * 32 + 2, Math.floor(i / 4) * 32 + 2, 28, 28); });
     });
     noShadow(mesh(new THREE.PlaneGeometry(6, 3), mat('#ffffff', { map: swatch, emissiveMap: swatch, emissive: '#ffffff', emissiveIntensity: 0.6 }), 11, ly(11, 3) + 2.4, 3, g)).rotation.y = -0.6;
-    mesh(new THREE.BoxGeometry(6.4, 3.4, 0.2), mat('#1b1e2c'), 11 + Math.sin(-0.6) * -0.15, ly(11, 3) + 2.4, 3 - Math.cos(-0.6) * 0.15, g).rotation.y = -0.6;
+    mesh(new THREE.BoxGeometry(6.4, 3.4, 0.2), metal(K), 11 + Math.sin(-0.6) * -0.15, ly(11, 3) + 2.4, 3 - Math.cos(-0.6) * 0.15, g).rotation.y = -0.6;
     col(11, 3, 2);
     sparkles(g, 120, '#e6b8ff', 22, 1, 18, 0.45, 1);
     animators.push((t, dt) => {
@@ -371,22 +396,32 @@ export const CYBER_BUILDERS = {
       if (pt.nearD > 34 && towers.length < (isTouch ? 70 : 120) && hash2(pt.x, pt.z) < 0.4) towers.push(pt);
       else if (i % 3 === 0) trees.push(pt);
     });
-    const win = windowTex(K);
-    const towerM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: win, emissiveMap: win, emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.6 }), towers.length);
-    towerM.material.userData.day = 0.3; towerM.material.userData.night = 1.3;
+    // 依高度分四組，每組用預先縮放好 UV 的方塊，窗格才不會被拉長
+    const towerMat = new THREE.MeshStandardMaterial({ map: windowTex(K), emissiveMap: windowLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.55, metalness: 0.15 });
+    towerMat.userData.day = 0.12; towerMat.userData.night = 1.4;
+    const BUCKET = [10, 18, 26, 37], bucketOf = (h) => BUCKET.findIndex((b) => h <= b + 2);
+    const specs = towers.map((pt, i) => ({ pt, i, w: 3 + hash2(i, 1) * 3, d: 3 + hash2(i, 2) * 3, h: 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z)) }));
+    BUCKET.forEach((bh, bi) => {
+      const list = specs.filter((sp) => (bucketOf(sp.h) < 0 ? 3 : bucketOf(sp.h)) === bi);
+      if (!list.length) return;
+      const im = new THREE.InstancedMesh(boxGeo(K, 4.5, bh, 4.5, 2.6), towerMat, list.length);
+      list.forEach(({ pt, i, w, d, h }, k) => {
+        q.setFromAxisAngle(up, hash2(i, 4) * 1.5);
+        m4.compose(p.set(pt.x, pt.h + h / 2, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); im.setMatrixAt(k, m4);
+        im.setColorAt(k, col.set(['#ffffff', '#e6ecf5', '#f2efe8'][i % 3]));
+      });
+      im.castShadow = true; im.receiveShadow = true; scene.add(im);
+    });
     const capM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), towers.length);
-    towers.forEach((pt, i) => {
-      const w = 3 + hash2(i, 1) * 3, d = 3 + hash2(i, 2) * 3, h = 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z));
+    specs.forEach(({ pt, i, w, d, h }) => {
       q.setFromAxisAngle(up, hash2(i, 4) * 1.5);
-      m4.compose(p.set(pt.x, pt.h + h / 2, pt.z), q, s.set(w, h, d)); towerM.setMatrixAt(i, m4);
-      towerM.setColorAt(i, col.set('#ffffff').multiplyScalar(0.75 + hash2(i, 5) * 0.4));
       m4.compose(p.set(pt.x, pt.h + h + 0.15, pt.z), q, s.set(w + 0.1, 0.25, d + 0.1)); capM.setMatrixAt(i, m4);
       capM.setColorAt(i, col.set(NEON[i % NEON.length]));
       colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.6 });
     });
-    towerM.castShadow = true; towerM.receiveShadow = true; scene.add(towerM, capM);
+    scene.add(capM);
     // 2. 霓虹樹：細樹幹＋發光的錐形樹冠
-    const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.2, 2, 5), new THREE.MeshStandardMaterial({ color: '#1b1e2c' }), trees.length);
+    const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.2, 2, 5), new THREE.MeshStandardMaterial({ color: '#8a93a3', roughness: 0.5, metalness: 0.4 }), trees.length);
     const crownM = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 2.6, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, toneMapped: false }), trees.length);
     trees.forEach((pt, i) => {
       const sc = 0.7 + hash2(i, 6) * 0.6;
@@ -413,7 +448,7 @@ export const CYBER_BUILDERS = {
     scene.add(stripM);
     // 4. 飛行車流：沿幾條環狀航道飛行
     const N = isTouch ? 14 : 26, cars = [];
-    const carM = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.45, 1.4, 4, 8), new THREE.MeshStandardMaterial({ color: '#2a2f42', emissive: '#3ef0ff', emissiveIntensity: 0.4 }), N);
+    const carM = new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.45, 1.4, 4, 8), new THREE.MeshStandardMaterial({ color: '#c3c8d0', metalness: 0.5, roughness: 0.35, emissive: '#3ef0ff', emissiveIntensity: 0.4 }), N);
     const tailM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.18, 0.1), new THREE.MeshBasicMaterial({ color: '#ff4fd8', toneMapped: false }), N);
     for (let i = 0; i < N; i++) cars.push({ rad: 45 + (i % 5) * 18, y: 28 + (i % 4) * 7, a: hash2(i, 9) * Math.PI * 2, sp: (0.05 + hash2(i, 10) * 0.05) * (i % 2 ? 1 : -1) });
     scene.add(carM, tailM);

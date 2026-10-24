@@ -135,6 +135,19 @@ async function run(browser, name, opts) {
   check('單一老師任務重置', resetStage === 0 && await page.evaluate(() => !!document.querySelector('[data-q="accept"]')));
   await page.keyboard.press('Escape');
 
+  // 日夜：白天按快速切換變成夜晚；點時鐘打開面板，拉桿設定時刻
+  await page.evaluate(() => window.__quest.setHour(12));
+  await page.waitForTimeout(500);
+  await page.click('#btn-daynight'); await page.waitForTimeout(500);
+  const toNight = await page.evaluate(() => Math.floor(window.__quest.dayNight.hour));
+  await page.click('#clock'); await page.waitForTimeout(300);
+  await page.evaluate(() => { const r = document.querySelector('#tp-range'); r.value = 7; r.dispatchEvent(new Event('input', { bubbles: true })); });
+  await page.waitForTimeout(500);
+  const tp = await page.evaluate(() => ({ open: !document.querySelector('#time-panel').hidden, h: Math.floor(window.__quest.dayNight.hour), label: document.querySelector('#tp-now').textContent }));
+  await shot('time');
+  await page.keyboard.press('Escape');
+  check('日夜切換與時間拉桿', toNight === 21 && tp.open && tp.h === 7 && tp.label === '7 時', `夜晚 ${toNight} 時、拉桿 ${tp.h} 時`);
+
   // 探險模式
   await page.evaluate(() => window.__quest.setMode('explore'));
   await page.waitForTimeout(1500);
