@@ -55,6 +55,20 @@ function signTex(K, text, bg, fg = '#ffffff') {
   });
 }
 const texMatOf = (K, t, color = '#ffffff', o = {}) => K.mat(color, { map: t, ...o });
+/* 室內燈光：夜裡亮起的窗（貼圖格子與白天的窗格對齊），白天幾乎不亮 */
+const litGlassTex = (K) => ctex(K, 'litglass', 64, 64, (c, w, h) => {
+  c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#ffd99a'; c.fillRect(4, 4, 26, 60); c.fillStyle = '#5a4630'; c.fillRect(33, 4, 31, 60);
+});
+const litFacadeTex = (K) => ctex(K, 'litfacade', 64, 64, (c, w, h) => {
+  c.fillStyle = '#000000'; c.fillRect(0, 0, w, h);
+  c.fillStyle = '#ffe2a8'; c.fillRect(10, 14, 18, 26); c.fillStyle = '#6a5236'; c.fillRect(36, 14, 18, 26);
+});
+function litMat(K, tex, lit, color = '#ffffff') {
+  const m = K.mat(color, { map: tex, emissiveMap: lit, emissive: '#ffd99a', emissiveIntensity: 0.02 });
+  m.userData.day = 0.02; m.userData.night = 1;
+  return m;
+}
 const flatNoShadow = (m) => { m.castShadow = false; return m; };
 
 /* 共用小物件 */
@@ -67,6 +81,7 @@ function lamp(K, g, u, v, y, col = '#fff2c4') {
   const { THREE, mesh, mat } = K;
   mesh(new THREE.CylinderGeometry(0.07, 0.1, 3.4, 6), mat('#3b4048'), u, y + 1.7, v, g);
   flatNoShadow(mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(col, { emissive: col, emissiveIntensity: 1.1 }), u, y + 3.5, v, g));
+  K.addLight(g, u, y + 3.5, v, '#ffc870', { pool: 5 });
 }
 function bench(K, g, u, v, y, rot = 0) {
   const { THREE, mesh, mat } = K;
@@ -90,7 +105,7 @@ export const MODERN_BUILDERS = {
   capital(r, K) {
     const { THREE, mesh, mat, animators, sparkles, camNear, hash2 } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
-    const glass = texMatOf(K, glassTex(K)), facade = texMatOf(K, facadeTex(K), '#f4efe6'), paver = texMatOf(K, paverTex(K), '#e9e4da');
+    const glass = litMat(K, glassTex(K), litGlassTex(K)), facade = litMat(K, facadeTex(K), litFacadeTex(K), '#f4efe6'), paver = texMatOf(K, paverTex(K), '#e9e4da');
     // 市民廣場
     const plaza = mesh(new THREE.CylinderGeometry(17, 17.4, 0.6, 40), paver, 0, 0.1, 0, g); plaza.receiveShadow = true;
     plaza.geometry.attributes.uv.array.forEach((_, i, a) => { a[i] *= 6; });
@@ -156,7 +171,7 @@ export const MODERN_BUILDERS = {
   forest(r, K) {
     const { THREE, mesh, mat, animators, camNear, sparkles, hash2 } = K;
     const ctx = K.regionCtx(r), { g, col, ly, clear } = ctx;
-    const glass = texMatOf(K, glassTex(K), '#cfe8f0'), roofGreen = mat('#6fae4f'), white = mat('#eef1f4');
+    const glass = litMat(K, glassTex(K), litGlassTex(K), '#cfe8f0'), roofGreen = mat('#6fae4f'), white = mat('#eef1f4');
     // 三棟辦公大樓
     for (const [u, v, w, h, d] of [[-9, -5, 7, 12, 7], [9, -4, 6, 9, 8], [0, -11, 10, 7, 6]]) {
       mesh(boxGeo(K, w, h, d, 2.2), glass, u, h / 2, v, g);
@@ -325,7 +340,7 @@ export const MODERN_BUILDERS = {
     shops.forEach(([name, c, wallC], i) => {
       const [u, v, rot] = spots[i];
       const h = new THREE.Group(); h.position.set(u, ly(u, v), v); h.rotation.y = rot; g.add(h);
-      mesh(boxGeo(K, 8, 9, 6, 3), texMatOf(K, facadeTex(K), wallC), 0, 4.5, 0, h);
+      mesh(boxGeo(K, 8, 9, 6, 3), litMat(K, facadeTex(K), litFacadeTex(K), wallC), 0, 4.5, 0, h);
       mesh(new THREE.BoxGeometry(8.2, 0.4, 6.2), mat('#8b8f96'), 0, 9.2, 0, h);
       // 騎樓：一樓內縮，正面兩根柱子
       mesh(new THREE.BoxGeometry(8, 3, 0.2), mat('#3b4048'), 0, 1.5, 1.8, h);
@@ -431,6 +446,7 @@ export const MODERN_BUILDERS = {
     const bodyM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), K.mat('#ffffff'), houses.length);
     const roofM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.62, 0.62, 1, 3), K.mat('#ffffff'), houses.length);
     const winM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), K.mat('#9fc4e6', { emissive: '#ffe1a0', emissiveIntensity: 0.15 }), houses.length);
+    winM.material.userData.day = 0.08; winM.material.userData.night = 1.2; // 夜裡家家戶戶亮燈
     houses.forEach((pt, i) => {
       const rd = roads.reduce((b, rd) => { const t = Math.max(0, Math.min(1, (pt.x * rd.bx + pt.z * rd.bz) / (rd.len * rd.len))); const d = Math.hypot(pt.x - rd.bx * t, pt.z - rd.bz * t); return d < b.d ? { d, rd, t } : b; }, { d: 1e9 });
       // 面向道路
@@ -484,6 +500,7 @@ export const MODERN_BUILDERS = {
       m4.compose(p.set(l.x, y + 1.8, l.z), q.identity(), s.set(1, 1, 1)); poleM.setMatrixAt(i, m4);
       m4.compose(p.set(l.x, y + 3.7, l.z), q, s.set(1, 1, 1)); headM.setMatrixAt(i, m4);
       colliders.push({ x: l.x, z: l.z, r: 0.25 });
+      K.addLight(null, l.x, y + 3.7, l.z, '#ffc870', { pool: 6 });
     });
     poleM.castShadow = true; scene.add(poleM, headM);
     // 4. 少量岩石（海邊）

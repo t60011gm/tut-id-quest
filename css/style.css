@@ -181,6 +181,14 @@ button { cursor: pointer; }
 .sound-btn .ic-on, .sound-btn.on .ic-off { display: none; }
 .sound-btn.on .ic-on { display: block; }
 #btn-sound.on { color: var(--brass); border-color: var(--brass); }
+/* 遊戲時鐘（日夜循環） */
+.clock {
+  position: absolute; top: 8px; left: 8px; padding: 3px 9px 3px 22px; border-radius: 99px;
+  background: var(--plate-solid); border: 1px solid var(--brass-dim); color: var(--ink-light);
+  font-size: 12px; font-variant-numeric: tabular-nums; pointer-events: auto;
+}
+.clock::before { content: ""; position: absolute; left: 7px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: #ffd36b; box-shadow: 0 0 6px #ffb347; }
+.clock[data-phase="night"]::before { background: transparent; box-shadow: inset -3px -1px 0 0 #dfe8ff; }
 
 #hint {
   position: fixed; z-index: 14; left: 50%; bottom: var(--bot);
@@ -468,6 +476,8 @@ button { cursor: pointer; }
   #minimap { width: 104px; height: 104px; }
   #btn-sound { top: auto; right: auto; bottom: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%; }
   #btn-sound svg { width: 15px; height: 15px; }
+  .clock { top: auto; left: auto; right: 2px; bottom: 2px; font-size: 10.5px; padding: 2px 6px 2px 18px; }
+  .clock::before { left: 5px; width: 8px; height: 8px; margin-top: -4px; }
   #minimap-wrap figcaption { display: none; }
   #hint { max-width: calc(100vw - 32px); font-size: 11.5px; }
   body.exploring #hint { display: none; }

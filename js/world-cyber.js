@@ -44,10 +44,17 @@ function neonPylon(K, g, u, v, y, c) {
   mesh(new THREE.BoxGeometry(0.22, 3.6, 0.22), mat('#1b1e2c'), u, y + 1.8, v, g);
   noShadow(mesh(new THREE.BoxGeometry(0.08, 3.2, 0.26), glow(K, c), u, y + 1.8, v, g));
   noShadow(mesh(new THREE.OctahedronGeometry(0.22), glow(K, c, 2), u, y + 3.8, v, g));
+  K.addLight(g, u, y + 3.8, v, c, { pool: 4 });
+}
+/* 大樓窗格材質：白天只微微發亮，夜裡全亮 */
+function windowMat(K) {
+  const m = K.mat('#ffffff', { map: windowTex(K), emissiveMap: windowTex(K), emissive: '#ffffff', emissiveIntensity: 0.9 });
+  m.userData.day = 0.3; m.userData.night = 1.3;
+  return m;
 }
 function tower(K, g, u, v, y, w, h, d, c, unit = 3) {
   const { THREE, mesh, mat } = K;
-  mesh(boxGeo(K, w, h, d, unit), mat('#ffffff', { map: windowTex(K), emissiveMap: windowTex(K), emissive: '#ffffff', emissiveIntensity: 0.9 }), u, y + h / 2, v, g);
+  mesh(boxGeo(K, w, h, d, unit), windowMat(K), u, y + h / 2, v, g);
   mesh(new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2), mat('#1b1e2c'), u, y + h + 0.15, v, g);
   for (const [x, z, L, rot] of [[0, d / 2 + 0.06, w, 0], [0, -d / 2 - 0.06, w, 0], [w / 2 + 0.06, 0, d, Math.PI / 2], [-w / 2 - 0.06, 0, d, Math.PI / 2]]) {
     const e = noShadow(mesh(new THREE.BoxGeometry(L, 0.12, 0.08), glow(K, c), u + x, y + h + 0.32, v + z, g)); e.rotation.y = rot;
@@ -217,7 +224,7 @@ export const CYBER_BUILDERS = {
     const { THREE, mesh, mat, animators, camNear, sparkles } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     // 工廠：深色量體＋黃黑警示條＋霓虹招牌
-    mesh(boxGeo(K, 16, 7, 8, 2.4), mat('#ffffff', { map: windowTex(K), emissiveMap: windowTex(K), emissive: '#ffffff', emissiveIntensity: 0.6 }), 0, 3.5, -9, g);
+    mesh(boxGeo(K, 16, 7, 8, 2.4), windowMat(K), 0, 3.5, -9, g);
     const hazard = ctex(K, 'hazard', 64, 16, (c, w, h) => { c.fillStyle = '#1d1a18'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd23e'; for (let x = -16; x < w; x += 16) { c.beginPath(); c.moveTo(x, h); c.lineTo(x + 8, 0); c.lineTo(x + 16, 0); c.lineTo(x + 8, h); c.fill(); } });
     hazard.repeat.set(6, 1);
     noShadow(mesh(new THREE.PlaneGeometry(16, 0.8), mat('#ffffff', { map: hazard }), 0, 0.5, -4.98, g));
@@ -366,6 +373,7 @@ export const CYBER_BUILDERS = {
     });
     const win = windowTex(K);
     const towerM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ map: win, emissiveMap: win, emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.6 }), towers.length);
+    towerM.material.userData.day = 0.3; towerM.material.userData.night = 1.3;
     const capM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), towers.length);
     towers.forEach((pt, i) => {
       const w = 3 + hash2(i, 1) * 3, d = 3 + hash2(i, 2) * 3, h = 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z));
@@ -398,7 +406,10 @@ export const CYBER_BUILDERS = {
       }
     });
     const stripM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.08, 1.1), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), strips.length);
-    strips.forEach((st, i) => { q.setFromAxisAngle(up, st.ang); m4.compose(p.set(st.x, heightAt(st.x, st.z) + 0.1, st.z), q, s.set(1, 1, 1)); stripM.setMatrixAt(i, m4); stripM.setColorAt(i, col.set(st.c)); });
+    strips.forEach((st, i) => {
+      q.setFromAxisAngle(up, st.ang); m4.compose(p.set(st.x, heightAt(st.x, st.z) + 0.1, st.z), q, s.set(1, 1, 1)); stripM.setMatrixAt(i, m4); stripM.setColorAt(i, col.set(st.c));
+      if (i % 6 === 0) K.addLight(null, st.x, heightAt(st.x, st.z) + 0.3, st.z, st.c, { pool: 4.5, noHalo: true }); // 夜裡路面映出霓虹
+    });
     scene.add(stripM);
     // 4. 飛行車流：沿幾條環狀航道飛行
     const N = isTouch ? 14 : 26, cars = [];

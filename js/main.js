@@ -12,8 +12,8 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=5';
 import { installTrials } from './trials.js?v=2';
-import { MODERN_BUILDERS } from './world-modern.js?v=1';
-import { CYBER_BUILDERS } from './world-cyber.js?v=1';
+import { MODERN_BUILDERS } from './world-modern.js?v=3';
+import { CYBER_BUILDERS } from './world-cyber.js?v=2';
 
 const W = window.WORLD;
 
@@ -88,17 +88,18 @@ const ENV = {
     }
   },
   cyber: {
-    sky: ['#070820', '#3b1758', '#04030c'], water: '#0a1730', hemi: ['#6f5cff', '#0d1226', 1.05], sun: 1.35, exposure: 1.2,
-    terrain: { grass: '#262b40', sand: '#2b2d44', wet: '#171a2c', rock: '#34374e', path: '#11131f', pink: '#4a2a5e' },
+    // 白天是帶紫的霧霾晴天，夜裡（見 DN）才是深色霓虹夜景
+    sky: ['#3e6fb8', '#a48cc8', '#1d3a66'], water: '#1b3f66', hemi: ['#c9c2ff', '#2a2f48', 1.45], sun: 2.1, exposure: 1.1,
+    terrain: { grass: '#4b5372', sand: '#4a4d66', wet: '#2c3048', rock: '#5a5e78', path: '#262a3e', pink: '#6a4a86' },
     style: {
-      capital: { ground: '#2c2848', foliage: '#ff4fd8' }, forest: { ground: '#18304a', foliage: '#3ee6ff' },
-      valley: { ground: '#1d3a34', foliage: '#4dffb0' }, workshop: { ground: '#3a2a22', foliage: '#ff9a3c' },
-      market: { ground: '#3a1f3a', foliage: '#ff5d8f' }, plateau: { ground: '#33204e', foliage: '#c77dff' }
+      capital: { ground: '#5a5480', foliage: '#ff4fd8' }, forest: { ground: '#3a5a7e', foliage: '#3ee6ff' },
+      valley: { ground: '#3e6a62', foliage: '#4dffb0' }, workshop: { ground: '#6a5446', foliage: '#ff9a3c' },
+      market: { ground: '#6a446a', foliage: '#ff5d8f' }, plateau: { ground: '#5e4884', foliage: '#c77dff' }
     },
     mood: {
-      capital: { fog: '#2a1846', hemi: '#8a6cff', sun: '#b9c8ff' }, forest: { fog: '#0f2a46', hemi: '#4fd8ff', sun: '#9fe9ff' },
-      valley: { fog: '#123a36', hemi: '#5affc0', sun: '#bfffe6' }, workshop: { fog: '#3a2018', hemi: '#ffaa66', sun: '#ffd0a0' },
-      market: { fog: '#3a1032', hemi: '#ff6fb0', sun: '#ffc2e0' }, plateau: { fog: '#2c1450', hemi: '#c88cff', sun: '#e6c8ff' }
+      capital: { fog: '#b9a6d8', hemi: '#d6ccff', sun: '#fff0f6' }, forest: { fog: '#a6c4e0', hemi: '#c6ecff', sun: '#eaf8ff' },
+      valley: { fog: '#a8d4c8', hemi: '#cfffe8', sun: '#f0fff6' }, workshop: { fog: '#d8b8a0', hemi: '#ffe0c6', sun: '#fff0dc' },
+      market: { fog: '#d8a8c8', hemi: '#ffd6ec', sun: '#fff0f6' }, plateau: { fog: '#c6aee6', hemi: '#ecdcff', sun: '#fbf0ff' }
     }
   }
 };
@@ -314,6 +315,10 @@ function mesh(geo, m, x = 0, y = 0, z = 0, parent = null) {
 }
 const animators = [];
 const colliders = [];
+/* 夜燈位置（路燈、火把、霓虹柱）：夜裡在這些點亮起光暈與地面光圈。
+ * parent 給了就是 parent 的區域座標（地標群組在合併前位置還沒算好，等全部建好再換算成世界座標） */
+const lightSpots = [];
+function addLight(parent, x, y, z, color, o = {}) { lightSpots.push({ parent, x, y, z, color, pool: 5, ...o }); }
 const npcSlots = [];
 
 const dotTex = (() => {
@@ -1309,7 +1314,7 @@ const BUILDERS = { capital: buildCapital, forest: buildForest, valley: buildVall
 const K = {
   THREE, scene, regions, RG, fields, FIELD_R, isTouch, animators, colliders,
   regionCtx, mesh, mat, texMat, canvasTex, drapedPlane, groundFX, sparkles, camNear, dyn, hash2, sstep,
-  heightAt, terrainInfo, isClear, playerLocal: (g, out) => playerLocal(g, out)
+  heightAt, terrainInfo, isClear, addLight, playerLocal: (g, out) => playerLocal(g, out)
 };
 const WORLD_BUILDERS = { modern: MODERN_BUILDERS, cyber: CYBER_BUILDERS }[WORLD_ID] || BUILDERS;
 regions.forEach((r) => (WORLD_BUILDERS[r.id] ? WORLD_BUILDERS[r.id](r, K) : regionCtx(r)));
@@ -1325,6 +1330,7 @@ fields.forEach((f, fi) => {
     const a = k / 8 * Math.PI * 2 + 0.2, u = Math.cos(a) * (FIELD_R + 0.6), v = Math.sin(a) * (FIELD_R + 0.6), y = ctx.ly(u, v);
     mesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2, 6), post, u, y + 1.1, v, g);
     mesh(new THREE.OctahedronGeometry(0.32), lamp, u, y + 2.5, v, g).castShadow = false;
+    addLight(null, f.x + u, y + 2.5, f.z + v, f.r.color, { pool: 3 });
     colliders.push({ x: f.x + u, z: f.z + v, r: 0.3 });
   }
   const ringMat = groundFX({ time: { value: 0 }, col: { value: new THREE.Color(f.r.color) } },
@@ -1344,6 +1350,39 @@ fields.forEach((f, fi) => {
   const o = new CSS2DObject(el); o.position.set(0, ctx.ly(0, 0) + 5, 0); g.add(o);
   fieldSigns.push({ el, pos: new THREE.Vector3(f.x, ctx.ly(0, 0), f.z) });
 });
+
+/* ---------- 中古奇幻：沿路與區域入口的火把（夜裡點亮） ---------- */
+if (WORLD_ID === 'fantasy') {
+  const spots = [];
+  regions.filter((r) => r.id !== 'capital').forEach((r) => {
+    const len = Math.hypot(r.x, r.z), dx = r.x / len, dz = r.z / len;
+    for (let d = len * 0.33, k = 0; d < len * 0.74; d += 11, k++) {
+      const side = k % 2 ? 1 : -1, x = dx * d + dz * 3.4 * side, z = dz * d - dx * 3.4 * side;
+      if (isClear(x, z, 0.4)) spots.push([x, z]);
+    }
+  });
+  regions.forEach((r) => {
+    const px = -r.toward.y, pz = r.toward.x; // 入口兩側
+    for (const side of [-1, 1]) { const x = r.approach.x + px * 4.5 * side, z = r.approach.z + pz * 4.5 * side; if (isClear(x, z, 0.4)) spots.push([x, z]); }
+    // 導師兩側與地標前方（區域座標 u 橫向、v 指向王都）
+    const near = r.id === 'capital' ? [[-8, 21], [8, 21], [-17, 11], [17, 11]] : [[-7, 13], [7, 13], [-11, 5], [11, 5]];
+    for (const [u, v] of near) { const x = r.x + u * r.toward.y + v * r.toward.x, z = r.z - u * r.toward.x + v * r.toward.y; if (isClear(x, z, 0.8)) spots.push([x, z]); }
+  });
+  const pole = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.12, 2.6, 6), texMat('wood', '#6b4a2f'), spots.length);
+  const bowl = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.14, 0.3, 8), mat('#3a332c'), spots.length);
+  const fire = new THREE.InstancedMesh(new THREE.ConeGeometry(0.2, 0.55, 7), mat('#ffb347', { emissive: '#ff7a1a', emissiveIntensity: 1.4 }), spots.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+  spots.forEach(([x, z], i) => {
+    const y = heightAt(x, z);
+    m4.compose(p.set(x, y + 1.3, z), q, sc); pole.setMatrixAt(i, m4);
+    m4.compose(p.set(x, y + 2.7, z), q, sc); bowl.setMatrixAt(i, m4);
+    m4.compose(p.set(x, y + 3.05, z), q, sc); fire.setMatrixAt(i, m4);
+    colliders.push({ x, z, r: 0.3 });
+    addLight(null, x, y + 3.1, z, '#ffa040', { flame: true, pool: 6 });
+  });
+  pole.castShadow = true; fire.castShadow = false;
+  scene.add(pole, bowl, fire);
+}
 
 /* ---------- 植被與岩石 ---------- */
 {
@@ -2759,6 +2798,15 @@ function updateMood(dt) {
   }
   const m = (best && MOOD_COL[best.id]) || moodBase;
   for (const key of ['fog', 'hemi', 'sun']) moodCol[key].copy(moodBase[key]).lerp(m[key], w);
+  // 日夜：黃昏染上暖色，夜裡換成夜色與月光
+  const N = DN_COL;
+  moodCol.fog.lerp(N.dusk.fog, dn.dusk * 0.55).lerp(N.night.fog, dn.night * 0.85); // 夜裡保留一點區域色調
+  moodCol.hemi.lerp(N.night.hemi, dn.night * 0.85);
+  moodCol.sun.lerp(N.dusk.sun, dn.dusk * 0.7).lerp(N.night.moon, dn.night);
+  skyMat.uniforms.top.value.copy(N.day.top).lerp(N.dusk.top, dn.dusk * 0.6).lerp(N.night.top, dn.night);
+  skyMat.uniforms.bot.value.copy(N.day.bot).lerp(N.dusk.bot, dn.dusk * 0.5).lerp(N.night.bot, dn.night);
+  hemi.intensity = EV.hemi[2] + (DN.night.hemiI - EV.hemi[2]) * dn.night;
+  sunLight.intensity = EV.sun * dn.day + DN.night.moonI * dn.night;
   const k = reduceMotion ? 1 : Math.min(1, dt * 2);
   scene.fog.color.lerp(moodCol.fog, k);
   skyMat.uniforms.mid.value.lerp(moodCol.fog, k);
@@ -2837,6 +2885,124 @@ function mergeStatic() {
 }
 const mergeInfo = mergeStatic();
 
+/* =========================================================================
+ * 日夜循環：現實 1 小時＝遊戲裡 1 天，跟著真實時鐘走（重新整理不會重來）。
+ * 太陽方向、天空、霧、天光隨時間改變；夜裡出現星星與月亮，發光材質（窗戶、燈、霓虹）變亮，
+ * 路燈、火把、霓虹柱亮起光暈與地面光圈。網址加 ?time=20 可指定開始的時刻（測試用）。
+ * ========================================================================= */
+const DAY_SEC = 3600;
+let clockShift = 0;
+const hourNow = () => ((((Date.now() / 1000 + clockShift) % DAY_SEC) + DAY_SEC) % DAY_SEC) / DAY_SEC * 24;
+function setHour(h) { clockShift += ((h - hourNow()) / 24) * DAY_SEC; }
+{ const tp = new URLSearchParams(location.search).get('time'); if (tp !== null && !Number.isNaN(parseFloat(tp))) setHour(parseFloat(tp)); }
+
+/* 各世界的白天／黃昏／夜晚：天空上下色、霧色、天光、陽光（夜裡是月光） */
+const DN = {
+  fantasy: { dusk: { top: '#4a4f8f', bot: '#3a4f6f', fog: '#f2a27a', sun: '#ff9a5a' }, night: { top: '#050918', bot: '#07122a', fog: '#18213d', hemi: '#40508a', hemiI: 0.45, moon: '#a9bcff', moonI: 0.45 }, dayK: 1, boost: 1.8 },
+  modern: { dusk: { top: '#3f5a9a', bot: '#2c5470', fog: '#f0a07a', sun: '#ff9e60' }, night: { top: '#060b1c', bot: '#081628', fog: '#1a2236', hemi: '#45557e', hemiI: 0.5, moon: '#b0c4ff', moonI: 0.45 }, dayK: 1, boost: 1.7 },
+  cyber: { dusk: { top: '#3a1f6e', bot: '#2a1040', fog: '#c0508a', sun: '#ff6fa0' }, night: { top: '#070820', bot: '#04030c', fog: '#1d1236', hemi: '#5a4cff', hemiI: 0.75, moon: '#9fd4ff', moonI: 0.55 }, dayK: 0.5, boost: 1.6 }
+}[WORLD_ID];
+const DN_COL = {
+  dusk: { top: new THREE.Color(DN.dusk.top), bot: new THREE.Color(DN.dusk.bot), fog: new THREE.Color(DN.dusk.fog), sun: new THREE.Color(DN.dusk.sun) },
+  night: { top: new THREE.Color(DN.night.top), bot: new THREE.Color(DN.night.bot), fog: new THREE.Color(DN.night.fog), hemi: new THREE.Color(DN.night.hemi), moon: new THREE.Color(DN.night.moon) },
+  day: { top: new THREE.Color(EV.sky[0]), bot: new THREE.Color(EV.sky[2]) }
+};
+const dn = { hour: 12, day: 1, dusk: 0, night: 0 };
+function dayFactors() {
+  const h = hourNow(), elev = Math.sin((h - 6) / 12 * Math.PI); // 正午 1、午夜 −1
+  dn.hour = h; dn.elev = elev;
+  dn.day = sstep(-0.06, 0.32, elev);
+  dn.night = 1 - sstep(-0.3, 0.02, elev);
+  dn.dusk = Math.max(0, 1 - Math.abs(elev + 0.04) / 0.32);
+}
+dayFactors();
+
+/* 星星與日月 */
+const stars = (() => {
+  const n = 700, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = hash2(i, 1.3) * Math.PI * 2, y = 0.08 + hash2(i, 2.7) * 0.92, rr = Math.sqrt(1 - y * y);
+    pos[i * 3] = Math.cos(a) * rr * 640; pos[i * 3 + 1] = y * 640; pos[i * 3 + 2] = Math.sin(a) * rr * 640;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const p = new THREE.Points(g, new THREE.PointsMaterial({ color: '#ffffff', size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  scene.add(p); return p;
+})();
+const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: '#fff2c4', fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending }));
+const moonSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, color: '#dfe8ff', fog: false, depthWrite: false, transparent: true }));
+sunSprite.scale.setScalar(90); moonSprite.scale.setScalar(36);
+scene.add(sunSprite, moonSprite);
+
+/* 夜燈：路燈、火把、霓虹柱的光暈（Points）與地面光圈（InstancedMesh），白天隱藏 */
+const nightLamps = (() => {
+  scene.updateMatrixWorld(true);
+  const wp = new THREE.Vector3();
+  for (const l of lightSpots) if (l.parent) { l.parent.localToWorld(wp.set(l.x, l.y, l.z)); Object.assign(l, { x: wp.x, y: wp.y, z: wp.z, parent: null }); }
+  const groups = { halo: [], flame: [] };
+  for (const l of lightSpots) if (!l.noHalo) (l.flame ? groups.flame : groups.halo).push(l);
+  const make = (list, size) => {
+    if (!list.length) return null;
+    const pos = new Float32Array(list.length * 3), col = new Float32Array(list.length * 3), c = new THREE.Color();
+    list.forEach((l, i) => { pos.set([l.x, l.y, l.z], i * 3); c.set(l.color); col.set([c.r, c.g, c.b], i * 3); });
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ size, map: dotTex, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    scene.add(p); return p;
+  };
+  const halo = make(groups.halo, 3.2), flame = make(groups.flame, 2.8);
+  const pools = lightSpots.filter((l) => l.pool);
+  let pool = null;
+  if (pools.length) {
+    const geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    pool = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: dotTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), pools.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
+    pools.forEach((l, i) => { m4.compose(p.set(l.x, heightAt(l.x, l.z) + 0.15, l.z), q, s.set(l.pool, 1, l.pool)); pool.setMatrixAt(i, m4); pool.setColorAt(i, c.set(l.color)); });
+    pool.renderOrder = 2; scene.add(pool);
+  }
+  return { halo, flame, pool };
+})();
+
+/* 發光材質：開場時記下每個材質的亮度，白天／夜晚依比例調整；有自己動畫的材質不接管 */
+const nightGlows = (() => {
+  const mats = new Set();
+  scene.traverse((o) => {
+    const list = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of list) if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) mats.add(m);
+  });
+  const arr = [...mats];
+  detecting = true;
+  const snap = (t) => { animators.forEach((fn) => fn(t, 0.016)); return arr.map((m) => m.emissiveIntensity); };
+  const a = snap(3.3), b = snap(7.1), c = snap(11.9);
+  animators.forEach((fn) => fn(0, 0));
+  detecting = false;
+  return arr.map((m, i) => (a[i] === b[i] && b[i] === c[i] ? { m, day: m.userData.day ?? a[i] * DN.dayK, night: m.userData.night ?? a[i] * DN.boost } : null)).filter(Boolean);
+})();
+
+/* 小地圖角落的時鐘 */
+const clockEl = $('#clock');
+let clockText = '';
+const sunDir = new THREE.Vector3();
+function updateDayNight(t) {
+  dayFactors();
+  const th = (dn.hour - 6) / 12 * Math.PI;
+  // 太陽從東（+x）升起、西（−x）落下；夜裡改用月光，方向與太陽相反
+  if (dn.elev > -0.05) sunDir.set(Math.cos(th), Math.max(0.18, Math.sin(th)), 0.45).normalize();
+  else sunDir.set(-Math.cos(th), Math.max(0.3, -Math.sin(th)), -0.35).normalize();
+  SUN_OFF.copy(sunDir).multiplyScalar(175);
+  sunSprite.position.copy(camera.position).addScaledVector(new THREE.Vector3(Math.cos(th), Math.sin(th), 0.45).normalize(), 600);
+  moonSprite.position.copy(camera.position).addScaledVector(new THREE.Vector3(-Math.cos(th), -Math.sin(th), -0.35).normalize(), 600);
+  sunSprite.material.opacity = sstep(-0.12, 0.05, dn.elev); moonSprite.material.opacity = dn.night;
+  stars.material.opacity = dn.night * 0.95;
+  const n = dn.night;
+  nightGlows.forEach((g) => { g.m.emissiveIntensity = g.day + (g.night - g.day) * n; });
+  if (nightLamps.halo) nightLamps.halo.material.opacity = n * 0.7;
+  if (nightLamps.flame) { nightLamps.flame.material.opacity = n * (0.75 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.07); nightLamps.flame.material.size = 2.8 + Math.sin(t * 9.1) * 0.25; }
+  if (nightLamps.pool) nightLamps.pool.material.opacity = n * 0.5;
+  renderer.toneMappingExposure = EV.exposure * (1 + n * 0.18);
+  const hh = Math.floor(dn.hour), mm = Math.floor((dn.hour - hh) * 60);
+  const label = `${dn.night > 0.5 ? '夜晚' : dn.dusk > 0.5 ? (dn.hour < 12 ? '清晨' : '黃昏') : '白天'} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+  if (label !== clockText) { clockText = label; clockEl.textContent = label; clockEl.dataset.phase = dn.night > 0.5 ? 'night' : 'day'; }
+}
+
 /* 任務系統（js/quests.js）：在合併靜態模型之後建立，小怪才不會被合併 */
 const quests = initQuests({
   scene, camera, $, esc, isTouch, heightAt, faculty, RG, FIELD_R, npcs, state, player, mat, sound,
@@ -2874,6 +3040,7 @@ function tick() {
 
   updateNPCs(t, dt);
   quests.update(t, dt);
+  updateDayNight(t);
   updateMood(dt);
   updateShadow();
 
@@ -2920,4 +3087,4 @@ window.addEventListener('resize', () => {
 });
 
 // 提供給測試腳本
-window.__quest = { state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo, quests };
+window.__quest = { setHour, dayNight: dn, state, setMode, selectTeacher, goRegion, faculty, regions, openCard, closeCard, toggleCodex, reveal, explored, camera, controls, teleport, renderer, mergeInfo, quests };
