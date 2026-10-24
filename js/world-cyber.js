@@ -85,30 +85,34 @@ function shellMat(K, color = '#ffffff') {
   m.userData.day = 0.06; m.userData.night = 1.25;
   return m;
 }
-/* 自由形體高樓：依 seed 決定扭轉、擺動與起伏；屋頂一圈霓虹 */
+/* 旋轉樓板疊層塔（單棟）：依 seed 決定扭轉、擺動與起伏；每層樓板陽台，屋頂一圈霓虹 */
 function tower(K, g, u, v, y, w, h, d, c, seed = 1) {
   const { THREE, mesh, hash2 } = K;
   const sec = paramSection({ w: w / 2, d: d / 2, taper: 0.15 + hash2(seed, 1) * 0.3, bulge: 0.25 + hash2(seed, 2) * 0.5, freq: 1 + hash2(seed, 3) * 1.4, phase: hash2(seed, 4) * 6, twist: (hash2(seed, 5) - 0.5) * 3, sway: 0.4 + hash2(seed, 6) * 1.4, swayZ: 0.5, flare: 0.6 });
-  const ft = fluidTower(K, h, 28, 32, sec, 2.4);
+  const ft = fluidTower(K, h, Math.round(h * 2), 32, sec, 2.4);
   const t = new THREE.Group(); t.position.set(u, y, v); g.add(t);
   mesh(ft.geo, shellMat(K), 0, 0, 0, t);
-  const tr = terraceGeo(K, ft, [0.3, 0.55, 0.8]);
+  const tr = floorSlabs(K, ft, h, 2.6);
   mesh(tr.geo, K.mat('#eef1f4'), 0, 0, 0, t); plantShrubs(K, t, tr.plants, 0.5);
   noShadow(mesh(ft.cap, glow(K, c, 1.4), 0, 0, 0, t));
   t.add(noShadow(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(ft.rings[ft.rings.length - 1].map((p) => p.clone().multiplyScalar(1.01))), new THREE.LineBasicMaterial({ color: c }))));
   return ft;
 }
-/* ── 造型二：Meta-ball 融合體（低矮建築）──
- * 幾顆能量球互相融合成圓潤的有機量體；回傳底面 1×1、高 1、底部貼地的幾何，用縮放決定實際大小 */
+/* ── 演算法二：Meta-ball 融合體（中高層）──
+ * 幾顆能量球沿垂直方向疊起、互相融合成瘦高的有機量體（球與球之間留下腰身）；
+ * 回傳底面 1×1、高 1、底部貼地的幾何，用縮放決定實際大小 */
 function metaballGeo(K, seed) {
   const { THREE, hash2 } = K;
-  const mc = new MarchingCubes(K.isTouch ? 22 : 30, new THREE.MeshBasicMaterial(), false, false, 40000);
+  const mc = new MarchingCubes(K.isTouch ? 24 : 34, new THREE.MeshBasicMaterial(), false, false, 60000);
   mc.isolation = 80; mc.reset();
-  const n = 4 + Math.floor(hash2(seed, 1) * 3);
+  // 主幹：一串間距很近、由下往上漸小的球，沿垂直軸對齊（只微微偏移），融成有腰身的瘦高量體
+  const n = 6 + Math.floor(hash2(seed, 1) * 2), ph = hash2(seed, 2) * 6;
   for (let i = 0; i < n; i++) {
-    const a = i / n * Math.PI * 2 + hash2(seed, i + 2) * 1.2, r = 0.08 + hash2(seed, i + 9) * 0.12; // 球距適中：融成一體但保留分瓣
-    mc.addBall(0.5 + Math.cos(a) * r, 0.34 + hash2(seed, i + 3) * 0.1, 0.5 + Math.sin(a) * r, 0.42 + hash2(seed, i + 5) * 0.32, 12);
+    const k = i / (n - 1), y = 0.2 + k * 0.58, off = 0.025 * Math.sin(k * 5 + ph);
+    mc.addBall(0.5 + off, y, 0.5 + 0.025 * Math.cos(k * 4 + ph), (0.34 + 0.08 * Math.sin(k * 7 + ph)) * (1 - k * 0.3), 12);
   }
+  // 底部兩顆側邊小球：像裙擺一樣把量體穩穩接到地面
+  for (let i = 0; i < 2; i++) { const a = ph + i * Math.PI; mc.addBall(0.5 + Math.cos(a) * 0.09, 0.2, 0.5 + Math.sin(a) * 0.09, 0.26, 12); }
   mc.update();
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(mc.positionArray.slice(0, mc.count * 3), 3));
@@ -117,20 +121,27 @@ function metaballGeo(K, seed) {
   const b = geo.boundingBox;
   geo.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
   geo.scale(1 / (b.max.x - b.min.x), 1 / (b.max.y - b.min.y), 1 / (b.max.z - b.min.z));
-  geo.translate(0, -0.06, 0); // 稍微埋進地面
+  geo.translate(0, -0.03, 0); // 稍微埋進地面
   return geo;
 }
-/* Meta-ball 外殼材質：珍珠白，腰間幾道帶窗（白天是藍灰玻璃，夜裡亮起） */
-function blobMat(K, Standard = false) {
+/* 有機外殼材質：珍珠白＋帶窗（白天是藍灰玻璃，夜裡亮起）。帶窗以幾何的正規化高度 vBandY（0～1）計算：
+ *   'tall'   Meta-ball 塔：一層層水平帶窗
+ *   'aliyev' 橫向流動展館：底部一圈玻璃帷幕＋上方一道細窗帶 */
+const BAND_GLSL = {
+  tall: 'float band = smoothstep(0.3, 0.36, fract(vBandY * 9.0)) * smoothstep(0.72, 0.66, fract(vBandY * 9.0)) * step(0.07, vBandY) * step(vBandY, 0.9);',
+  aliyev: 'float band = smoothstep(0.05, 0.08, vBandY) * smoothstep(0.34, 0.31, vBandY) + smoothstep(0.46, 0.48, vBandY) * smoothstep(0.54, 0.52, vBandY) * 0.8;'
+};
+function blobMat(K, Standard = false, mode = 'tall') {
   const { THREE } = K;
   const m = Standard ? new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.3, metalness: 0.15, emissive: '#cfefff', emissiveIntensity: 0.05 })
-    : K.mat('#f4f2f8', { emissive: '#cfefff', emissiveIntensity: 0.05 });
+    : K.mat('#f4f2f8:' + mode, { color: '#f4f2f8', emissive: '#cfefff', emissiveIntensity: 0.05 });
   if (!m.userData.band) {
     m.userData.band = true; m.userData.day = 0.05; m.userData.night = 1.3;
+    m.customProgramCacheKey = () => 'band-' + mode;
     m.onBeforeCompile = (sh) => {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vBandY;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvBandY = position.y;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vBandY;')
-        .replace('vec3 totalEmissiveRadiance = emissive;', `float band = smoothstep(0.24, 0.27, vBandY) * smoothstep(0.38, 0.35, vBandY) + smoothstep(0.5, 0.53, vBandY) * smoothstep(0.64, 0.61, vBandY);
+        .replace('vec3 totalEmissiveRadiance = emissive;', `${BAND_GLSL[mode]}
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.32, 0.42, 0.56), band * 0.85);
           vec3 totalEmissiveRadiance = emissive * band;`);
     };
@@ -138,36 +149,53 @@ function blobMat(K, Standard = false) {
   return m;
 }
 function blobBuilding(K, g, u, v, y, w, h, d, seed) {
-  const m = K.mesh(metaballGeo(K, seed), blobMat(K), u, y, v, g);
+  const m = K.mesh(metaballGeo(K, seed), blobMat(K, false, 'tall'), u, y, v, g);
   m.scale.set(w, h, d); m.rotation.y = seed;
   return m;
 }
-/* ── 造型三：旋轉樓板疊層塔（中高層）──
- * 每層樓板是一片橢圓，逐層旋轉、大小微微起伏，疊成扭轉的樓板雕塑；中間是發光的玻璃核心筒 */
-const plateGeo = (K) => (TEX.get('plateGeo') || (TEX.set('plateGeo', new K.THREE.CylinderGeometry(1, 1, 0.3, 32)), TEX.get('plateGeo')));
-function coreMat(K) {
-  const m = K.mat('#7d95b5', { emissive: '#bfefff', emissiveIntensity: 0.1 });
-  m.userData.day = 0.08; m.userData.night = 1.3;
+/* ── 演算法三：橫向斷面變形（中低層，參考 Heydar Aliyev Center）──
+ * 把流線塔「放倒」：沿水平長軸 x 一段段放半個超橢圓拱形斷面，斷面的高度、深度、前後偏移與傾斜
+ * 沿長軸連續變形，兩端流進地面，一端翹起成高聳的捲曲屋頂。回傳長 1、高 1、深 1、底部貼地的幾何 */
+function aliyevGeo(K, seed) {
+  const { THREE, hash2 } = K;
+  const NX = 56, NT = 22, n = 2.6, pos = [], idx = [];
+  const ph = hash2(seed, 1) * 6, ph2 = hash2(seed, 2) * 6, rise = 0.25 + hash2(seed, 3) * 0.35, dir = hash2(seed, 4) < 0.5 ? 1 : -1;
+  for (let i = 0; i <= NX; i++) {
+    const k = i / NX, kk = dir > 0 ? k : 1 - k, env = Math.sin(Math.PI * k) ** 0.45;
+    const crest = Math.exp(-(((kk - 0.76) / 0.12) ** 2)); // 靠一端隆起的浪頭
+    const h = env * (0.38 + 0.18 * Math.sin(kk * Math.PI * 2 + ph) + (0.55 + rise) * crest);
+    const d = 0.5 * Math.sin(Math.PI * k) ** 0.35 * (0.72 + 0.28 * Math.sin(k * Math.PI * 1.4 + ph2));
+    const dz = 0.14 * Math.sin(k * Math.PI * 1.6 + ph2), lean = 0.2 * Math.sin(k * Math.PI * 1.3 + ph) + 0.45 * crest; // 平面上擺動、浪頭往前捲出懸挑
+    for (let j = 0; j <= NT; j++) {
+      const th = j / NT * Math.PI, c = Math.cos(th), sn = Math.sin(th);
+      const y = Math.abs(sn) ** (2 / n) * h, z = Math.sign(c) * Math.abs(c) ** (2 / n) * d + dz + lean * y;
+      pos.push(k - 0.5, y, z);
+    }
+  }
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NT; j++) { const a = i * (NT + 1) + j, b = a + NT + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
+  geo.computeBoundingBox();
+  const b = geo.boundingBox;
+  geo.translate(0, 0, -(b.min.z + b.max.z) / 2);
+  geo.scale(1, 1 / b.max.y, 1 / (b.max.z - b.min.z));
+  geo.translate(0, -0.02, 0);
+  geo.computeVertexNormals();
+  return geo;
+}
+function aliyevBuilding(K, g, u, v, y, L, h, D, seed, rotY = 0) {
+  const m = K.mesh(aliyevGeo(K, seed), blobMat(K, false, 'aliyev'), u, y, v, g);
+  m.scale.set(L, h, D); m.rotation.y = rotY;
   return m;
 }
-const plateSpec = (K, w, h, d, seed) => {
-  const n = Math.max(4, Math.floor(h / 1.25)), rot = 0.09 + K.hash2(seed, 1) * 0.1, ph = K.hash2(seed, 2) * 6;
-  return Array.from({ length: n }, (_, i) => ({ y: 0.5 + i * 1.25, a: w / 2 * (0.8 + 0.2 * Math.sin(i * 0.45 + ph)), b: d / 2 * (0.62 + 0.18 * Math.sin(i * 0.38 + ph + 1)), r: i * rot }));
-};
-/* 樓板露台外緣的植栽點（塔的區域座標）：隔層種一圈 */
-const plateRim = (K, plates, seed) => plates.flatMap((pl, i) => i % 2 || i === plates.length - 1 ? [] : Array.from({ length: 7 }, (_, k) => {
-  const a = k / 7 * Math.PI * 2 + K.hash2(seed, i) * 0.6, x = Math.cos(a) * pl.a * 0.86, z = Math.sin(a) * pl.b * 0.86;
-  return new K.THREE.Vector3(x * Math.cos(pl.r) + z * Math.sin(pl.r), pl.y + 0.15, -x * Math.sin(pl.r) + z * Math.cos(pl.r));
-}));
-function plateTower(K, g, u, v, y, w, h, d, c, seed) {
-  const { THREE, mesh } = K;
-  const t = new THREE.Group(); t.position.set(u, y, v); g.add(t);
-  const plates = plateSpec(K, w, h, d, seed);
-  plates.forEach((pl, i) => { const m = mesh(plateGeo(K), K.mat(i === plates.length - 1 ? c : '#f2f4f7', i === plates.length - 1 ? { emissive: c, emissiveIntensity: 1.2 } : {}), 0, pl.y, 0, t); m.scale.set(pl.a, 1, pl.b); m.rotation.y = pl.r; });
-  const cr = Math.min(w, d) * 0.3;
-  mesh(new THREE.CylinderGeometry(cr, cr, h, 16), coreMat(K), 0, h / 2, 0, t);
-  plantShrubs(K, t, plateRim(K, plates, seed), 0.45); // 每層樓板外緣都是露台花台
-  return t;
+/* ── 演算法一：旋轉樓板疊層塔（最高層，參考 MAD 的 Absolute Towers）──
+ * 流線塔的每一圈斷面都逐層扭轉，再沿每一層樓外推一圈樓板陽台，疊出旋轉的水平線條；
+ * every 是樓層間距，回傳樓板幾何與植栽點（每隔幾層一圈） */
+function floorSlabs(K, ft, H, every = 3, out = 1.12, plantEvery = 3) {
+  const levels = [];
+  for (let y = every; y < H - every * 0.6; y += every) levels.push(y / H);
+  const slab = terraceGeo(K, ft, levels, out, 0.22);
+  const plants = terraceGeo(K, ft, levels.filter((_, i) => i % plantEvery === 1), out, 0.22).plants;
+  return { geo: slab.geo, plants };
 }
 /* 波浪屋頂：兩端流向地面的連續曲面（工廠、展館用） */
 function waveRoof(K, L, D, H) {
@@ -316,7 +344,7 @@ export const CYBER_BUILDERS = {
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 44, '#ff4fd8');
     mesh(new THREE.CylinderGeometry(16, 16.6, 0.5, 40), concrete(K, '#c9c9c6'), 0, 0.05, 0, g);
-    // 參數化流動高樓（Zaha Hadid 風格）：白色流線外殼、水平帶窗、逐層扭轉的 S 形量體
+    // 旋轉樓板疊層塔（全城最高）：白色流線外殼、水平帶窗、逐層扭轉的 S 形量體與每層樓板陽台
     const H = 38, ft = fluidTower(K, H);
     const shellM = mat('#ffffff', { map: ribbonTex(K), emissiveMap: ribbonLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.1 });
     shellM.userData.day = 0.06; shellM.userData.night = 1.25;
@@ -325,6 +353,7 @@ export const CYBER_BUILDERS = {
     mesh(ft.cap, mat('#eef1f4'), 0, 0, 0, tower);
     const tr = terraceGeo(K, ft, [0.22, 0.42, 0.62, 0.8], 1.18, 0.45); // 空中花園露台
     mesh(tr.geo, mat('#eef1f4'), 0, 0, 0, tower); plantShrubs(K, tower, tr.plants, 0.7);
+    mesh(floorSlabs(K, ft, H, 2.7, 1.09).geo, mat('#eef1f4'), 0, 0, 0, tower); // 每層樓板陽台隨斷面逐層旋轉
     col(0, -3, 7);
     // 霓虹輪廓線：沿著幾圈樓板勾出曲面，夜裡最明顯
     const contours = [10, 20, 30, 40, 48].map((ri, i) => {
@@ -523,10 +552,10 @@ export const CYBER_BUILDERS = {
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 40, '#ff5d8f', 2.4);
     // 兩側高樓
-    // 三種參數化造型各一棟：流線扭轉塔、旋轉樓板疊層塔、Meta-ball 融合體
-    tower(K, g, -13, -8, ly(-13, -8), 6, 18, 6, '#ff5d8f', 3); col(-13, -8, 3.6);
-    plateTower(K, g, 13, -8, ly(13, -8), 7, 16, 6, '#3ef0ff', 4); col(13, -8, 3.4);
-    blobBuilding(K, g, 0, -15, ly(0, -15), 12, 7, 8, 5); col(-3, -15, 4); col(3, -15, 4);
+    // 三種演算法各一棟：旋轉樓板疊層塔、瘦高 Meta-ball、橫向斷面變形展館
+    tower(K, g, -13, -8, ly(-13, -8), 7, 20, 6.5, '#ff5d8f', 3); col(-13, -8, 3.8);
+    blobBuilding(K, g, 13, -8, ly(13, -8), 6.5, 17, 6, 4); col(13, -8, 3.2);
+    aliyevBuilding(K, g, 0, -16, ly(0, -16), 20, 10, 9, 5); col(-5, -16, 4); col(0, -16, 4); col(5, -16, 4);
     // 夜市攤位
     const stalls = [['拉麵', '#ff4fd8'], ['設計', r.color], ['AR', '#3ef0ff'], ['奶茶', '#ffd23e'], ['二手', '#4dffb0'], ['社造', '#ff9a3c']];
     stalls.forEach(([name, c], i) => {
@@ -626,77 +655,68 @@ export const CYBER_BUILDERS = {
       else if (i % 4 !== 3) greens.push(pt);
     });
     const plants = []; // 露台植栽（世界座標），最後一起種
-    // 全城建築：三種參數化造型輪流出現——
-    //   低矮：Meta-ball 融合體；中高層：旋轉樓板疊層塔與流線扭轉塔輪流；超高層：以流線塔為主、穿插疊層塔
-    // 流線塔：四個高度級距 × 兩種形體，共八個原型，用實例化擺滿全城
+    // 全城建築：三種演算法依高度分派——
+    //   中低層：橫向斷面變形展館（Heydar Aliyev）；中高層：瘦高 Meta-ball；最高層：旋轉樓板疊層塔
     const towerMat = new THREE.MeshStandardMaterial({ map: ribbonTex(K), emissiveMap: ribbonLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.1, roughness: 0.45, metalness: 0.1 });
     towerMat.userData.day = 0.06; towerMat.userData.night = 1.3;
     const capMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
-    const BUCKET = [10, 18, 26, 37], bucketOf = (h) => { const b = BUCKET.findIndex((x) => h <= x + 2); return b < 0 ? 3 : b; };
-    const VARIANT = [
-      { taper: 0.2, bulge: 0.3, freq: 1.4, phase: 0.3, twist: 1.8, sway: 0.9, swayZ: 0.4, flare: 0.4 },
-      { taper: 0.4, bulge: 0.45, freq: 2.2, phase: 2.1, twist: -0.8, sway: 0.4, swayZ: 0.6, flare: 0.5, waist: 0.1 }
-    ];
+    const slabMat = new THREE.MeshStandardMaterial({ color: '#eef1f4', roughness: 0.5 });
     const specs = towers.map((pt, i) => {
-      const h = 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z)), rnd = hash2(i, 7);
-      const kind = h < 13 ? (rnd < 0.85 ? 'blob' : 'plate') : h < 24 ? (i % 2 ? 'plate' : 'fluid') : (rnd < 0.35 ? 'plate' : 'fluid');
-      // 中高層量體要夠粗壯（斷面不小於高度的四分之一左右），避免一根根細長
-      const big = kind !== 'blob', w = big ? Math.max(5.5, h * 0.24) + hash2(i, 1) * 3 : 3 + hash2(i, 1) * 3, d = big ? Math.max(5, h * 0.22) + hash2(i, 2) * 3 : 3 + hash2(i, 2) * 3;
-      return { pt, i, w, d, h, kind };
+      let h = 7 + hash2(i, 3) * 28 * sstep(150, 60, Math.hypot(pt.x, pt.z));
+      const kind = h < 13 ? 'aliyev' : h < 23 ? 'blob' : 'twist';
+      if (kind === 'aliyev') h *= 0.85; // 展館低平、橫向延伸
+      // 量體要夠粗壯：塔的斷面約高度的四分之一以上，Meta-ball 瘦高但不細長
+      const w = kind === 'aliyev' ? 14 + hash2(i, 1) * 7 : kind === 'blob' ? h * 0.32 + hash2(i, 1) * 2 : Math.max(6, h * 0.24) + hash2(i, 1) * 3;
+      const d = kind === 'aliyev' ? 7 + hash2(i, 2) * 3 : kind === 'blob' ? h * 0.3 + hash2(i, 2) * 2 : Math.max(5.5, h * 0.22) + hash2(i, 2) * 3;
+      return { pt, i, w, d, h, kind, rot: hash2(i, 4) * 6.28 };
     });
-    // Meta-ball 融合體：四個原型，壓低、放寬成展館或住宅般的量體
-    const blobs = specs.filter((sp) => sp.kind === 'blob'), bMat = blobMat(K, true);
+    // 中低層：橫向斷面變形展館，四個原型
+    const aMat = blobMat(K, true, 'aliyev');
     [0, 1, 2, 3].forEach((bi) => {
-      const list = blobs.filter((sp) => sp.i % 4 === bi); if (!list.length) return;
-      const im = new THREE.InstancedMesh(metaballGeo(K, bi * 7 + 1), bMat, list.length);
-      list.forEach(({ pt, i, w, d, h }, k) => {
-        q.setFromAxisAngle(up, hash2(i, 4) * 6.28);
-        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w * 1.7, h * 0.75, d * 1.7)); im.setMatrixAt(k, m4);
+      const list = specs.filter((sp) => sp.kind === 'aliyev' && sp.i % 4 === bi); if (!list.length) return;
+      const im = new THREE.InstancedMesh(aliyevGeo(K, bi * 5 + 2), aMat, list.length);
+      list.forEach(({ pt, i, w, d, h, rot }, k) => {
+        q.setFromAxisAngle(up, rot);
+        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w, h, d)); im.setMatrixAt(k, m4);
         im.setColorAt(k, col.set(['#ffffff', '#eef2fb', '#f8eef6', '#eefaf6'][i % 4]));
-        colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.85 });
+        for (const f of [-0.3, 0, 0.3]) colliders.push({ x: pt.x + Math.cos(rot) * w * f, z: pt.z - Math.sin(rot) * w * f, r: d * 0.5 });
       });
       im.castShadow = true; im.receiveShadow = true; scene.add(im);
     });
-    // 旋轉樓板疊層塔：所有樓板共用一個實例化網格，核心筒另一個
-    const plateTowers = specs.filter((sp) => sp.kind === 'plate'), plateList = [];
-    plateTowers.forEach((sp) => {
-      const rot0 = hash2(sp.i, 4) * 6.28, pls = plateSpec(K, sp.w, sp.h, sp.d, sp.i).map((pl) => ({ ...pl, r: pl.r + rot0 }));
-      pls.forEach((pl, k) => plateList.push({ sp, pl, top: k === pls.length - 1 }));
-      plateRim(K, pls, sp.i).forEach((v) => plants.push(v.add(p.set(sp.pt.x, sp.pt.h, sp.pt.z))));
+    // 中高層：瘦高 Meta-ball，四個原型
+    const bMat = blobMat(K, true, 'tall');
+    [0, 1, 2, 3].forEach((bi) => {
+      const list = specs.filter((sp) => sp.kind === 'blob' && sp.i % 4 === bi); if (!list.length) return;
+      const im = new THREE.InstancedMesh(metaballGeo(K, bi * 7 + 1), bMat, list.length);
+      list.forEach(({ pt, i, w, d, h, rot }, k) => {
+        q.setFromAxisAngle(up, rot);
+        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w, h, d)); im.setMatrixAt(k, m4);
+        im.setColorAt(k, col.set(['#ffffff', '#eef2fb', '#f8eef6', '#eefaf6'][i % 4]));
+        colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.45 });
+      });
+      im.castShadow = true; im.receiveShadow = true; scene.add(im);
     });
-    const plateM = new THREE.InstancedMesh(plateGeo(K), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 }), plateList.length);
-    plateList.forEach(({ sp, pl, top }, k) => {
-      q.setFromAxisAngle(up, pl.r);
-      m4.compose(p.set(sp.pt.x, sp.pt.h + pl.y, sp.pt.z), q, s.set(pl.a, 1, pl.b)); plateM.setMatrixAt(k, m4);
-      plateM.setColorAt(k, col.set(top ? NEON[sp.i % NEON.length] : '#f2f4f7'));
-    });
-    plateM.castShadow = true; plateM.receiveShadow = true; scene.add(plateM);
-    const coreM = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 16), new THREE.MeshStandardMaterial({ color: '#7d95b5', roughness: 0.25, metalness: 0.3, emissive: '#bfefff', emissiveIntensity: 0.1 }), plateTowers.length);
-    coreM.material.userData.day = 0.08; coreM.material.userData.night = 1.3;
-    plateTowers.forEach((sp, k) => {
-      const cr = Math.min(sp.w, sp.d) * 0.3;
-      m4.compose(p.set(sp.pt.x, sp.pt.h + sp.h / 2, sp.pt.z), q.identity(), s.set(cr, sp.h, cr)); coreM.setMatrixAt(k, m4);
-      colliders.push({ x: sp.pt.x, z: sp.pt.z, r: Math.max(sp.w, sp.d) * 0.5 });
-    });
-    scene.add(coreM);
+    // 最高層：旋轉樓板疊層塔，兩個高度級距 × 兩種扭轉形體，每層樓板陽台、隔幾層種植栽
+    const BUCKET = [28, 36], bucketOf = (h) => (h <= 30 ? 0 : 1);
+    const VARIANT = [
+      { taper: 0.2, bulge: 0.3, freq: 1.4, phase: 0.3, twist: 1.8, sway: 0.9, swayZ: 0.4, flare: 0.4 },
+      { taper: 0.35, bulge: 0.4, freq: 2.2, phase: 2.1, twist: -1.4, sway: 0.4, swayZ: 0.6, flare: 0.5, waist: 0.1 }
+    ];
     BUCKET.forEach((bh, bi) => VARIANT.forEach((vr, vi) => {
-      const list = specs.filter((sp) => sp.kind === 'fluid' && bucketOf(sp.h) === bi && sp.i % 2 === vi);
+      const list = specs.filter((sp) => sp.kind === 'twist' && bucketOf(sp.h) === bi && sp.i % 2 === vi);
       if (!list.length) return;
-      const ft = fluidTower(K, bh, 16, 20, paramSection({ w: 2.25, d: 2.25, ...vr }), 2.4);
-      const body = new THREE.InstancedMesh(ft.geo, towerMat, list.length), cap = new THREE.InstancedMesh(ft.cap, capMat, list.length);
-      // 18 公尺以上的流線塔加空中露台（樓板＋植栽）
-      const tr = bi > 0 ? terraceGeo(K, ft, bi > 2 ? [0.25, 0.48, 0.7] : [0.35, 0.65], 1.25, 0.3) : null;
-      const slab = tr && new THREE.InstancedMesh(tr.geo, new THREE.MeshStandardMaterial({ color: '#eef1f4', roughness: 0.5 }), list.length);
-      list.forEach(({ pt, i, w, d, h }, k) => {
-        q.setFromAxisAngle(up, hash2(i, 4) * 6.28);
-        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); body.setMatrixAt(k, m4); cap.setMatrixAt(k, m4);
-        if (tr) { slab.setMatrixAt(k, m4); tr.plants.forEach((v) => plants.push(v.clone().applyMatrix4(m4))); }
+      const ft = fluidTower(K, bh, Math.round(bh * 1.5), 24, paramSection({ w: 2.25, d: 2.25, ...vr }), 2.4);
+      const tr = floorSlabs(K, ft, bh, 3, 1.14);
+      const body = new THREE.InstancedMesh(ft.geo, towerMat, list.length), cap = new THREE.InstancedMesh(ft.cap, capMat, list.length), slab = new THREE.InstancedMesh(tr.geo, slabMat, list.length);
+      list.forEach(({ pt, i, w, d, h, rot }, k) => {
+        q.setFromAxisAngle(up, rot);
+        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); body.setMatrixAt(k, m4); cap.setMatrixAt(k, m4); slab.setMatrixAt(k, m4);
+        tr.plants.forEach((v) => plants.push(v.clone().applyMatrix4(m4)));
         body.setColorAt(k, col.set(['#ffffff', '#e8eef6', '#f4f0f8'][i % 3]));
         cap.setColorAt(k, col.set(NEON[i % NEON.length]));
         colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.6 });
       });
-      body.castShadow = true; body.receiveShadow = true; scene.add(body, cap);
-      if (slab) { slab.castShadow = true; slab.receiveShadow = true; scene.add(slab); }
+      body.castShadow = slab.castShadow = true; body.receiveShadow = slab.receiveShadow = true; scene.add(body, cap, slab);
     }));
     plantShrubs(K, scene, plants, 0.6);
     // 綠色闊葉樹：樹幹＋兩團圓樹冠，填在建築之間
