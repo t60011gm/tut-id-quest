@@ -191,7 +191,7 @@ export function installTrials(registerTrial) {
 
   /* ───────── 徐灝：接出一座扭轉塔（設計運算、AI 整合）───────── */
   registerTrial('nodes', (box, data, { win }) => {
-    // 節點位置（百分比）：寬螢幕三欄由左到右；窄螢幕兩欄（左邊參數、右邊處理流程）
+    // 節點位置（百分比）：寬螢幕三欄由左到右；窄螢幕改成兩欄格線排列（左邊參數、右邊處理流程），字放大也不會重疊
     const narrow = box.clientWidth < 560;
     const POS = narrow
       ? { rect: [3, 3], floors: [3, 36], twist: [3, 69], copy: [53, 3], rotate: [53, 36], loft: [53, 69] }
@@ -200,7 +200,7 @@ export function installTrials(registerTrial) {
     let from = null, stage = 'wire';
     box.innerHTML = `<div class="tg-head"><span class="tg-step">先點節點右側的輸出點，再點另一個節點左側的輸入點</span></div>
       <div class="tg-graph ${narrow ? 'narrow' : ''}"><svg class="tg-wires" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>${data.nodes.map((n) => `
-        <div class="tg-gnode" data-id="${n.id}" style="left:${POS[n.id][0]}%;top:${POS[n.id][1]}%">
+        <div class="tg-gnode" data-id="${n.id}" style="${narrow ? `grid-column:${POS[n.id][0] < 50 ? 1 : 2};grid-row:${Math.round(POS[n.id][1] / 33) + 1}` : `left:${POS[n.id][0]}%;top:${POS[n.id][1]}%`}">
           ${(n.in || []).map((p) => `<button type="button" class="tg-port in" data-port="${n.id}.${esc(p)}">${esc(p)}</button>`).join('')}
           <b>${esc(n.name)}</b>${n.desc ? `<small>${esc(n.desc)}</small>` : ''}
           <button type="button" class="tg-port out" data-out="${n.id}">${esc(n.out)} ▸</button>
@@ -308,7 +308,7 @@ export function installTrials(registerTrial) {
     }
     function step(now) {
       if (!running) return;
-      const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
+      const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now; t += dt; // 手機上 rAF 的時間戳可能早於 performance.now()
       const vent = DEV.reduce((s, d, i) => s + (on[i] ? d.vent : 0), 0);
       co2 += (GEN * people() - vent * (co2 - OUT)) * dt;
       used += DEV.reduce((s, d, i) => s + (on[i] ? d.power : 0), 0) * dt;
@@ -408,7 +408,7 @@ export function installTrials(registerTrial) {
     }
     function loop(now) {
       if (!alive) return;
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
       if (!over) {
         cur.x += dir * speed * dt;
         if (cur.x + cur.w > W) { cur.x = W - cur.w; dir = -1; }
@@ -482,7 +482,7 @@ export function installTrials(registerTrial) {
       testing = true;
       const t0 = performance.now();
       const anim = (now) => {
-        const k = Math.min(1, (now - t0) / 1400);
+        const k = Math.max(0, Math.min(1, (now - t0) / 1400));
         draw(stable.map((ok) => (ok ? Math.sin(k * Math.PI * 4) * 2 * (1 - k) : Math.sin(k * Math.PI / 2) * 38)));
         if (k < 1) { raf = requestAnimationFrame(anim); return; }
         testing = false;
@@ -535,7 +535,7 @@ export function installTrials(registerTrial) {
   /* ───────── 許鹿麗：規劃一間店（商業空間、設計公司經營）───────── */
   registerTrial('storeplan', (box, data, { win }) => {
     // 店面平面上的位置（百分比，入口在下方中央）；顧客動線依序經過這些位置
-    const SPOT = { '入口內側 2 公尺': [50, 78], '入口後的右手邊': [80, 58], '店的最深處': [50, 13], '沿牆面': [14, 40], '靠近出口': [24, 80] };
+    const SPOT = { '入口內側 2 公尺': [50, 80], '入口後的右手邊': [84, 52], '店的最深處': [50, 14], '沿牆面': [16, 44], '靠近出口': [16, 80] }; // 三欄 16／50／84，窄螢幕也不重疊
     const PATH = ['入口內側 2 公尺', '入口後的右手邊', '店的最深處', '沿牆面', '靠近出口'];
     const place = {}; let picked = null, walking = false, raf = 0;
     const cost = (n) => (data.items.find((i) => i.name === n) || { cost: 0 }).cost;
@@ -568,7 +568,8 @@ export function installTrials(registerTrial) {
       const pts = [[50, 100], ...PATH.map((p) => SPOT[p]), [50, 100]];
       const t0 = performance.now(), dur = 4200;
       const anim = (now) => {
-        const k = Math.min(1, (now - t0) / dur), f = k * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), u = f - i;
+        // 手機上 rAF 給的時間戳可能比按下時的 performance.now() 還早，先夾在 0 以上，否則第一格會讀到 pts[-1] 而卡住
+        const k = Math.max(0, Math.min(1, (now - t0) / dur)), f = k * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), u = f - i;
         shopper.style.left = `${pts[i][0] + (pts[i + 1][0] - pts[i][0]) * u}%`; shopper.style.top = `${pts[i][1] + (pts[i + 1][1] - pts[i][1]) * u}%`;
         if (k < 1) { raf = requestAnimationFrame(anim); return; }
         walking = false; shopper.hidden = true;

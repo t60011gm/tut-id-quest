@@ -10,8 +10,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=5';
-import { installTrials } from './trials.js?v=2';
+import { initQuests, QUEST_KEY, registerTrial } from './quests.js?v=6';
+import { installTrials } from './trials.js?v=3';
 import { MODERN_BUILDERS } from './world-modern.js?v=3';
 import { CYBER_BUILDERS } from './world-cyber.js?v=2';
 

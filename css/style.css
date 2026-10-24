@@ -538,6 +538,9 @@ button { cursor: pointer; }
 .sheet .quest p { margin: 0; font-size: 14px; line-height: 1.7; }
 .sheet .quest .q-line { font-family: var(--f-lore); font-size: 15px; color: var(--ink-mid); }
 .sheet .quest .q-hint { font-size: 13px; color: var(--ink-soft); }
+.sheet .quest .q-reset { display: block; margin-top: 4px; padding: 4px 0; background: none; border: 0; font-size: 12.5px; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.sheet .quest .q-reset:hover { color: var(--ink); }
+.sheet .quest .q-reset.confirm { color: var(--seal); font-weight: 700; }
 .sheet .quest .q-count { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--seal); }
 .q-btn {
   justify-self: start; margin-top: 4px; padding: 7px 16px; border-radius: 6px; font-size: 14px; font-weight: 700;
@@ -760,8 +763,8 @@ button { cursor: pointer; }
   .tg-cats { grid-template-columns: 1fr; }
   .tg-pair { gap: 6px; }
   .tg-devices { grid-template-columns: repeat(2, 1fr); }
-  .tg-graph.narrow { height: 430px; }
-  .tg-graph.narrow .tg-gnode { width: 44%; min-width: 0; }
+  .tg-graph.narrow { height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; padding: 10px; align-items: start; }
+  .tg-graph.narrow .tg-gnode { position: relative; width: auto; min-width: 0; }
 }
 
 /* ---------- 第二批試煉 ---------- */
@@ -828,8 +831,10 @@ button { cursor: pointer; }
 
 @media (max-width: 720px) {
   .tg-wishes { grid-template-columns: 1fr; }
-  .tg-shop { height: 300px; }
-  .tg-slot { width: 34%; }
+  .tg-shop { height: 320px; border-width: 6px; }
+  .tg-slot { width: 31%; padding: 4px 3px; line-height: 1.25; }
+  .tg-slot small { font-size: 10px; }
+  .tg-slot b { font-size: 12px; }
 }
 
 /* 試煉合格證 */

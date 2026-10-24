@@ -221,7 +221,9 @@ export function initQuests(api) {
     else if (s.stage === STAGE.COLLECT) body = `<p>採集戰「${esc(q.stage1.game.title)}」：用 <b>${esc(q.stage1.game.tool)}</b> 取得 <b>${esc(q.stage1.item.name)}</b> ×${need()}</p><p class="q-hint">${esc(q.stage1.lines.hint)}</p><div class="q-btns"><button type="button" class="q-btn primary" data-q="fight">開始採集戰</button><button type="button" class="q-btn" data-q="go">前往${esc(fd.name)}</button></div>`;
     else if (s.stage === STAGE.TRIAL) body = `<p class="q-line">「${esc(q.stage1.lines.done)}」</p><button type="button" class="q-btn primary" data-q="trial">開始試煉</button>`;
     else body = `<p>已獲得徽章 <b class="q-badge-name">${esc(q.badge)}</b></p><button type="button" class="q-btn" data-q="trial">再挑戰一次試煉</button>`;
-    return `<section class="sect quest"><h4>${esc(q.stage2.title.split('：')[0])}</h4>${body}</section>`;
+    // 接過任務後可以單獨重置這位老師，從接任務重新玩一次
+    const reset = s.stage !== STAGE.NEW ? '<button type="button" class="q-reset" data-q="reset">重置這位老師的任務</button>' : '';
+    return `<section class="sect quest"><h4>${esc(q.stage2.title.split('：')[0])}</h4>${body}${reset}</section>`;
   }
   function bindCard(sheet, f) {
     const sec = sheet.querySelector('.quest'); if (!sec) return;
@@ -236,7 +238,23 @@ export function initQuests(api) {
       } else if (b.dataset.q === 'go') goField(f);
       else if (b.dataset.q === 'fight') { api.closeCard(); openFight(f); }
       else if (b.dataset.q === 'trial') { api.closeCard(); openTrial(f); }
+      else if (b.dataset.q === 'reset') {
+        // 按第一次先確認，3 秒內再按一次才真的重置
+        if (!b.classList.contains('confirm')) {
+          b.classList.add('confirm'); b.textContent = '確定重置？再按一次（徽章也會收回）';
+          setTimeout(() => { if (b.isConnected) { b.classList.remove('confirm'); b.textContent = '重置這位老師的任務'; } }, 3000);
+          return;
+        }
+        resetTeacher(f);
+        sec.outerHTML = cardHTML(f); bindCard(sheet, f);
+        toast(f, '任務已重置', '可以重新接受任務，再玩一次採集戰與試煉');
+      }
     });
+  }
+  function resetTeacher(f) {
+    if (fight && fight.f.id === f.id) stopFight();
+    save.t[f.id] = { stage: STAGE.NEW, got: 0 };
+    despawn(f.id); refreshAll();
   }
 
   /* ---------- 試煉視窗 ---------- */
@@ -352,7 +370,7 @@ export function initQuests(api) {
     let last = performance.now();
     const loop = (now) => {
       if (!fight || fight.E !== E) return;
-      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
       let mx = joy.x, mz = joy.z;
       for (const k of keys) { mx += MOVE[k][0]; mz += MOVE[k][1]; }
       for (let k = 0; k < (fight.speed || 1) && !E.done; k++) E.update(dt, { mx, mz });
@@ -659,6 +677,7 @@ export function initQuests(api) {
     fightSpeed: (n) => { if (fight) fight.speed = n; }, // 3D 測試用：每幀多跑幾步（軟體繪圖太慢）
     startFight: (id, hard) => { const f = byId[id]; if (!fight) { tr.hidden = true; startFight(f, hard); } },
     simulate: (id, hard, sec = 300) => { const E = newArena(byId[id], hard); E.onEnd = () => {}; E.bot = true; E.simulate(sec); return { result: E.result, t: E.t, got: E.got }; },
+    resetTeacher: (id) => resetTeacher(byId[id]),
     completeAll: () => { faculty.forEach((f) => { if (Q.teachers[f.id]) st(f.id).stage = STAGE.DONE; }); refreshAll(); },
     showCertificate: () => showCertificate(),
     firstPos: () => { const m = monsters.find((x) => x.gone < 0); return m && { x: m.group.position.x, z: m.group.position.z }; }

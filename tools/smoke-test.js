@@ -127,6 +127,14 @@ async function run(browser, name, opts) {
   check('試煉視窗開啟', await page.evaluate(() => !document.querySelector('#trial').hidden));
   await page.keyboard.press('Escape');
 
+  // 單一老師重置：導師卡上的「重置這位老師的任務」按兩次，任務回到未接受
+  await page.evaluate(() => { const q = window.__quest; q.openCard(q.faculty.find((f) => f.id === 'huang-jiao-yi')); });
+  await page.waitForTimeout(600);
+  await page.click('[data-q="reset"]'); await page.click('[data-q="reset"]');
+  const resetStage = await page.evaluate(() => window.__quest.quests.debug.save().t['huang-jiao-yi'].stage);
+  check('單一老師任務重置', resetStage === 0 && await page.evaluate(() => !!document.querySelector('[data-q="accept"]')));
+  await page.keyboard.press('Escape');
+
   // 探險模式
   await page.evaluate(() => window.__quest.setMode('explore'));
   await page.waitForTimeout(1500);
