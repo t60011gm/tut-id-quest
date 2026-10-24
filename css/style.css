@@ -149,7 +149,12 @@ button { cursor: pointer; }
 .bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.09); overflow: hidden; }
 .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brass), #f6d68f); transition: width .6s ease; }
 
-.actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; }
+/* 圖鑑下方「重新開始」、報考下方「切換世界」：較小的第二排按鈕 */
+.act-col { display: grid; gap: 6px; align-content: start; }
+.btn.sub { justify-content: center; padding: 5px 10px; font-size: 12px; color: var(--ink-light-dim); }
+.btn.sub:hover { color: var(--ink-light); }
+.btn.sub svg { width: 13px; height: 13px; }
 .btn {
   display: inline-flex; align-items: center; gap: 7px;
   padding: 9px 14px; border-radius: 8px; text-decoration: none;
@@ -304,12 +309,6 @@ button { cursor: pointer; }
 .t-row .who small { display: block; font-family: var(--f-lore); font-size: 12.5px; color: var(--ink-light-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .t-row .mark { font-size: 11px; color: var(--ink-light-dim); }
 .t-row .mark.ok { color: var(--visited); }
-.codex-foot { display: flex; justify-content: space-between; gap: 8px; }
-.reset-btn {
-  align-self: center; background: none; border: 0; padding: 6px 10px;
-  font-size: 12px; color: var(--ink-light-dim); text-decoration: underline; text-underline-offset: 3px;
-}
-.reset-btn:hover { color: var(--ink-light); }
 .empty-note { font-family: var(--f-lore); color: var(--ink-light-dim); text-align: center; padding: 20px 0; }
 
 .avatar {
@@ -472,7 +471,7 @@ button { cursor: pointer; }
   .brand small, .progress { display: none; }
   .btn .lbl-long { display: none; }
   .btn { padding: 8px 11px; }
-  #minimap-wrap { left: auto; right: var(--gut-r); top: calc(var(--top) + 64px); bottom: auto; padding: 5px; }
+  #minimap-wrap { left: auto; right: var(--gut-r); top: calc(var(--top) + 100px); bottom: auto; padding: 5px; }
   #minimap { width: 104px; height: 104px; }
   #btn-sound { top: auto; right: auto; bottom: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%; }
   #btn-sound svg { width: 15px; height: 15px; }
@@ -504,7 +503,9 @@ button { cursor: pointer; }
   .actions { gap: 6px; }
   .btn { padding: 8px 9px; font-size: 13px; }
   .btn svg { width: 15px; height: 15px; }
-  #minimap-wrap { top: calc(var(--top) + 58px); }
+  #minimap-wrap { top: calc(var(--top) + 90px); }
+  .btn.sub { padding: 4px 6px; font-size: 11px; }
+  .btn.sub svg { display: none; }
   #tip { top: auto; bottom: calc(var(--bot) + 150px); }
   .title-card .eyebrow { letter-spacing: .28em; padding-left: .28em; }
   .title-card .lore { font-size: 14.5px; line-height: 1.8; line-break: strict; }

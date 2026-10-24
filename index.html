@@ -18,7 +18,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&display=swap">
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
 <script>
@@ -52,14 +52,26 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><path d="M12 8v6l-3 6M12 14l3 6M8 11h8"/></svg>
       <span id="mode-label">探險<span class="lbl-long">模式</span></span>
     </button>
-    <button class="btn" id="btn-codex" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M9 7h7M9 11h5"/></svg>
-      <span><span class="lbl-long">導師</span>圖鑑</span>
-    </button>
-    <a class="btn primary" id="btn-apply" target="_blank" rel="noopener">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-      <span>報考<span class="lbl-long">碩士班</span></span>
-    </a>
+    <div class="act-col">
+      <button class="btn" id="btn-codex" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M9 7h7M9 11h5"/></svg>
+        <span><span class="lbl-long">導師</span>圖鑑</span>
+      </button>
+      <button class="btn sub" id="btn-reset" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        <span>重新開始</span>
+      </button>
+    </div>
+    <div class="act-col">
+      <a class="btn primary" id="btn-apply" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span>報考<span class="lbl-long">碩士班</span></span>
+      </a>
+      <button class="btn sub" id="btn-world" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        <span>切換世界</span>
+      </button>
+    </div>
   </nav>
 </header>
 
@@ -108,7 +120,7 @@
   <div class="chips" id="codex-chips"></div>
   <div class="codex-list" id="codex-list"></div>
   <div class="quest-log" id="quest-log"></div>
-  <div class="codex-foot"><button class="reset-btn" id="btn-world" type="button">切換世界</button><button class="reset-btn" id="btn-reset" type="button">重新開始冒險</button></div>
+  
 </aside>
 
 <!-- 採集戰（正常版在 3D 採集場時的資訊列） -->
