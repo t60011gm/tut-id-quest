@@ -77,13 +77,34 @@ function windowMat(K) {
   m.userData.day = 0.12; m.userData.night = 1.4;
   return m;
 }
-function tower(K, g, u, v, y, w, h, d, c, unit = 3) {
-  const { THREE, mesh, mat } = K;
-  mesh(boxGeo(K, w, h, d, unit), windowMat(K), u, y + h / 2, v, g);
-  mesh(new THREE.BoxGeometry(w + 0.2, 0.3, d + 0.2), metal(K), u, y + h + 0.15, v, g);
-  for (const [x, z, L, rot] of [[0, d / 2 + 0.06, w, 0], [0, -d / 2 - 0.06, w, 0], [w / 2 + 0.06, 0, d, Math.PI / 2], [-w / 2 - 0.06, 0, d, Math.PI / 2]]) {
-    const e = noShadow(mesh(new THREE.BoxGeometry(L, 0.12, 0.08), glow(K, c), u + x, y + h + 0.32, v + z, g)); e.rotation.y = rot;
+/* 流線外殼材質：白色板帶＋水平帶窗，夜裡帶窗亮起 */
+function shellMat(K, color = '#ffffff') {
+  const m = K.mat(color, { map: ribbonTex(K), emissiveMap: ribbonLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.1 });
+  m.userData.day = 0.06; m.userData.night = 1.25;
+  return m;
+}
+/* 自由形體高樓：依 seed 決定扭轉、擺動與起伏；屋頂一圈霓虹 */
+function tower(K, g, u, v, y, w, h, d, c, seed = 1) {
+  const { THREE, mesh, hash2 } = K;
+  const sec = paramSection({ w: w / 2, d: d / 2, taper: 0.15 + hash2(seed, 1) * 0.3, bulge: 0.25 + hash2(seed, 2) * 0.5, freq: 1 + hash2(seed, 3) * 1.4, phase: hash2(seed, 4) * 6, twist: (hash2(seed, 5) - 0.5) * 3, sway: 0.4 + hash2(seed, 6) * 1.4, swayZ: 0.5, flare: 0.6 });
+  const ft = fluidTower(K, h, 28, 32, sec, 2.4);
+  const t = new THREE.Group(); t.position.set(u, y, v); g.add(t);
+  mesh(ft.geo, shellMat(K), 0, 0, 0, t);
+  noShadow(mesh(ft.cap, glow(K, c, 1.4), 0, 0, 0, t));
+  t.add(noShadow(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(ft.rings[ft.rings.length - 1].map((p) => p.clone().multiplyScalar(1.01))), new THREE.LineBasicMaterial({ color: c }))));
+  return ft;
+}
+/* 波浪屋頂：兩端流向地面的連續曲面（工廠、展館用） */
+function waveRoof(K, L, D, H) {
+  const { THREE } = K;
+  const NX = 40, NZ = 12, pos = [], idx = [];
+  for (let i = 0; i <= NX; i++) for (let j = 0; j <= NZ; j++) {
+    const x = (i / NX - 0.5) * L, z = (j / NZ - 0.5) * D, env = Math.sin(Math.PI * i / NX) ** 0.6;
+    pos.push(x, Math.max(0, H * env + Math.sin(x * 0.55 + z * 0.3) * 0.9 * env), z + Math.sin(x * 0.35) * 0.8);
   }
+  for (let i = 0; i < NX; i++) for (let j = 0; j < NZ; j++) { const a = i * (NZ + 1) + j, b = a + NZ + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+  return geo;
 }
 function holoScreen(K, g, w, h, x, y, z, rotY, draw, fps = 8) {
   const { THREE } = K;
@@ -106,12 +127,22 @@ function fluidSection(k) {
     dz: -Math.sin(k * Math.PI * 0.85) * 1.6
   };
 }
-function fluidTower(K, H = 38, RINGS = 56, SEG = 56) {
+/* 參數化斷面產生器：同一套公式調參數，就能長出扭轉塔、雙曲面塔、尖塔、圓頂等不同形體
+ *   w／d 半寬與半深　taper 往上收　bulge／freq／phase 寬窄起伏　twist 總扭轉角　sway／swayZ 擺動
+ *   flare 底部外擴　waist 腰身（雙曲面）　dome 1＝往上收成圓頂 */
+const paramSection = ({ w = 4, d = 3, taper = 0.3, bulge = 1, freq = 1.6, phase = 0, twist = 1.5, sway = 2, swayZ = 1, flare = 2.5, waist = 0, dome = 0 }) => (k) => {
+  const fl = (1 - k) ** 7 * flare, ws = 1 - waist * Math.sin(k * Math.PI), dm = dome ? Math.sqrt(Math.max(0.0001, 1 - k * k)) : 1;
+  return {
+    a: (w * (1 - k * taper) + Math.sin(k * Math.PI * freq + phase) * bulge) * ws * dm + fl,
+    b: (d * (1 - k * taper) + Math.sin(k * Math.PI * freq + phase + 0.9) * bulge * 0.7) * ws * dm + fl * 0.8,
+    twist: k * twist, dx: Math.sin(k * Math.PI * 1.25 + phase) * sway, dz: -Math.sin(k * Math.PI * 0.85) * swayZ
+  };
+};
+function fluidTower(K, H = 38, RINGS = 56, SEG = 56, section = fluidSection, n = 2.5) { // n：超橢圓指數，越大越方，2 是橢圓
   const { THREE } = K;
   const pos = [], uv = [], idx = [], rings = [];
-  const n = 2.5; // 超橢圓指數：越大越方，2 是橢圓
   for (let i = 0; i <= RINGS; i++) {
-    const k = i / RINGS, y = k * H, sc = fluidSection(k), ring = [];
+    const k = i / RINGS, y = k * H, sc = section(k), ring = [];
     const ct = Math.cos(sc.twist), st = Math.sin(sc.twist);
     for (let j = 0; j <= SEG; j++) {
       const th = j / SEG * Math.PI * 2, c = Math.cos(th), s = Math.sin(th);
@@ -239,11 +270,13 @@ export const CYBER_BUILDERS = {
       const a = hash2(k, 4.4) * Math.PI * 2, d = 7 + hash2(k, 2.2) * 12, u = Math.cos(a) * d, v = Math.sin(a) * d;
       if (!clear(u, v, 3)) continue;
       const h = 8 + hash2(k, 1.1) * 10, y = ly(u, v);
-      mesh(new THREE.CylinderGeometry(0.5, 1.1, h, 6), metal(K, '#8a94a6'), u, y + h / 2, v, g);
-      const st = streamTex.clone(); st.needsUpdate = true; st.repeat.set(2, h / 8);
-      const s = noShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.56, 1.16, h, 6, 1, true), new THREE.MeshBasicMaterial({ map: st, color: n % 2 ? '#7c5cff' : '#3ef0ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
-      s.position.set(u, y + h / 2, v); g.add(s); spires.push(st);
-      noShadow(mesh(new THREE.OctahedronGeometry(0.6), glow(K, n % 2 ? '#c3adff' : '#3ef0ff', 2), u, y + h + 0.8, v, g));
+      // 扭轉、漸細的參數化尖塔，表面流著資料光
+      const ft = fluidTower(K, h, 24, 18, paramSection({ w: 1.1, d: 0.8, taper: 0.75, bulge: 0.25, freq: 2, phase: k, twist: 3.2, sway: 0.5, swayZ: 0.3, flare: 1.2 }), 2.2);
+      mesh(ft.geo, shellMat(K, '#e8eef6'), u, y, v, g);
+      const st = streamTex.clone(); st.needsUpdate = true; st.repeat.set(0.2, 0.3);
+      const s = noShadow(new THREE.Mesh(ft.geo, new THREE.MeshBasicMaterial({ map: st, color: n % 2 ? '#7c5cff' : '#3ef0ff', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
+      s.position.set(u, y, v); s.scale.set(1.04, 1, 1.04); g.add(s); spires.push(st);
+      noShadow(mesh(new THREE.OctahedronGeometry(0.6), glow(K, n % 2 ? '#c3adff' : '#3ef0ff', 2), u + ft.top.x, y + h + 0.8, v + ft.top.z, g));
       col(u, v, 1.2); n++;
     }
     // 中央神經核心：三層神經元
@@ -275,9 +308,13 @@ export const CYBER_BUILDERS = {
     const fans = [];
     for (const [u, v, h] of [[-9, -6, 16], [9, -6, 13], [0, -13, 19]]) {
       const y = ly(u, v), tw = new THREE.Group(); tw.position.set(u, y, v); g.add(tw);
-      mesh(new THREE.CylinderGeometry(2.6, 3.4, h, 12), concrete(K, '#aeb0b2'), 0, h / 2, 0, tw);
-      for (let k = 1; k < 4; k++) noShadow(mesh(new THREE.TorusGeometry(2.7 + 0.25 * (1 - k / 4), 0.08, 4, 32), glow(K, '#4dffb0'), 0, h * k / 4, 0, tw)).rotation.x = Math.PI / 2;
-      mesh(new THREE.CylinderGeometry(2.9, 2.6, 1.2, 16, 1, true), metal(K, '#8e98a8', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
+      // 雙曲面腰身塔：中段收細、上下外擴，外覆霓虹斜格
+      const sec = paramSection({ w: 3, d: 3, taper: 0, bulge: 0, twist: 0.8, sway: 0, swayZ: 0, flare: 1.4, waist: 0.32 });
+      const ft = fluidTower(K, h, 24, 28, sec, 2);
+      mesh(ft.geo, shellMat(K, '#eef3f2'), 0, 0, 0, tw);
+      const grid = noShadow(new THREE.LineSegments(new THREE.WireframeGeometry(fluidTower(K, h, 8, 14, sec, 2).geo), new THREE.LineBasicMaterial({ color: '#4dffb0', transparent: true, opacity: 0.55 })));
+      grid.scale.set(1.03, 1, 1.03); tw.add(grid);
+      mesh(new THREE.CylinderGeometry(3.1, 3.0, 1.2, 24, 1, true), metal(K, '#8e98a8', { side: THREE.DoubleSide }), 0, h + 0.6, 0, tw);
       const fan = K.dyn(new THREE.Group()); fan.position.y = h + 0.8; tw.add(fan);
       for (let k = 0; k < 5; k++) { const b = mesh(new THREE.BoxGeometry(2.4, 0.08, 0.6), mat('#8a93ad'), 1.2, 0, 0, new THREE.Group()); const arm = b.parent; arm.rotation.y = k * Math.PI * 2 / 5; b.rotation.x = 0.4; fan.add(arm); }
       sparkles(tw, 40, '#9dffd0', 2.2, h + 1, h + 12, 0.5, 2.2);
@@ -314,13 +351,13 @@ export const CYBER_BUILDERS = {
   workshop(r, K) {
     const { THREE, mesh, mat, animators, camNear, sparkles } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
-    // 工廠：深色量體＋黃黑警示條＋霓虹招牌
-    mesh(boxGeo(K, 16, 7, 8, 2.4), windowMat(K), 0, 3.5, -9, g);
+    // 廠房：兩端流向地面的波浪屋頂＋玻璃立面＋黃黑警示條＋霓虹招牌
+    mesh(waveRoof(K, 20, 10, 8), mat('#f2f5f8', { side: THREE.DoubleSide }), 0, 0, -9, g);
+    mesh(boxGeo(K, 13, 5.6, 7, 2.4), windowMat(K), 0, 2.8, -9, g);
     const hazard = ctex(K, 'hazard', 64, 16, (c, w, h) => { c.fillStyle = '#1d1a18'; c.fillRect(0, 0, w, h); c.fillStyle = '#ffd23e'; for (let x = -16; x < w; x += 16) { c.beginPath(); c.moveTo(x, h); c.lineTo(x + 8, 0); c.lineTo(x + 16, 0); c.lineTo(x + 8, h); c.fill(); } });
     hazard.repeat.set(6, 1);
-    noShadow(mesh(new THREE.PlaneGeometry(16, 0.8), mat('#ffffff', { map: hazard }), 0, 0.5, -4.98, g));
-    noShadow(mesh(new THREE.PlaneGeometry(6, 1.8), mat('#ffffff', { map: neonSign(K, 'FAB-07', '#ff9a3c'), emissiveMap: neonSign(K, 'FAB-07', '#ff9a3c'), emissive: '#ffffff', emissiveIntensity: 1 }), 0, 6, -4.97, g));
-    for (let k = 0; k < 3; k++) mesh(new THREE.CylinderGeometry(0.6, 0.8, 5, 10), concrete(K), -5 + k * 5, 9.5, -11, g);
+    noShadow(mesh(new THREE.PlaneGeometry(13, 0.8), mat('#ffffff', { map: hazard }), 0, 0.5, -5.48, g));
+    noShadow(mesh(new THREE.PlaneGeometry(5, 1.5), mat('#ffffff', { map: neonSign(K, 'FAB-07', '#ff9a3c'), emissiveMap: neonSign(K, 'FAB-07', '#ff9a3c'), emissive: '#ffffff', emissiveIntensity: 1 }), 0, 4.6, -5.47, g));
     col(-5, -9, 4.6); col(0, -9, 4.6); col(5, -9, 4.6);
     // 輸送帶：箱子不停往前送
     const belt = new THREE.Group(); belt.position.set(0, ly(0, -2), -2); g.add(belt);
@@ -370,7 +407,7 @@ export const CYBER_BUILDERS = {
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 40, '#ff5d8f', 2.4);
     // 兩側高樓
-    for (const [u, v, w, h, d, c] of [[-13, -8, 6, 16, 6, '#ff5d8f'], [13, -8, 6, 13, 6, '#3ef0ff'], [0, -14, 10, 10, 5, '#ffd23e']]) { tower(K, g, u, v, ly(u, v), w, h, d, c); col(u, v, Math.max(w, d) * 0.6); }
+    [[-13, -8, 6, 18, 6, '#ff5d8f'], [13, -8, 6, 15, 6, '#3ef0ff'], [0, -14, 8, 12, 5, '#ffd23e']].forEach(([u, v, w, h, d, c], k) => { tower(K, g, u, v, ly(u, v), w, h, d, c, k + 3); col(u, v, Math.max(w, d) * 0.6); });
     // 夜市攤位
     const stalls = [['拉麵', '#ff4fd8'], ['設計', r.color], ['AR', '#3ef0ff'], ['奶茶', '#ffd23e'], ['二手', '#4dffb0'], ['社造', '#ff9a3c']];
     stalls.forEach(([name, c], i) => {
@@ -413,6 +450,11 @@ export const CYBER_BUILDERS = {
     const { THREE, mesh, mat, animators, camNear, sparkles } = K;
     const ctx = K.regionCtx(r), { g, col, ly } = ctx;
     const grid = neonGrid(K, ctx, 50, '#c77dff', 2.4);
+    // 有機曲面的圓頂展館：寬扁的流動量體往上收成圓頂，正面一道發光開口
+    const gal = fluidTower(K, 9, 30, 48, paramSection({ w: 9, d: 6, taper: 0, bulge: 1.1, freq: 1.2, phase: 0.6, twist: 0.6, sway: 1.2, swayZ: 0.4, flare: 0.8, dome: 1 }), 2.2);
+    mesh(gal.geo, shellMat(K, '#f6f2fb'), 0, ly(0, -17), -17, g);
+    noShadow(mesh(new THREE.PlaneGeometry(6, 1.4), glow(K, '#c77dff', 1.2), 0, ly(0, -17) + 2.4, -17 + 6.4, g));
+    col(-4, -17, 5); col(4, -17, 5);
     // 漂浮雕塑：三個大型線框幾何
     const sculpts = [[new THREE.IcosahedronGeometry(3, 0), -8, 9, -6, '#ff4fd8'], [new THREE.TorusKnotGeometry(2, 0.5, 64, 8), 0, 11, -10, '#3ef0ff'], [new THREE.OctahedronGeometry(2.8, 0), 8, 9, -6, '#ffd23e']].map(([geo, u, y, v, c]) => {
       const s = new THREE.Group(); s.position.set(u, ly(u, v) + y, v); g.add(s);
@@ -462,30 +504,30 @@ export const CYBER_BUILDERS = {
       if (pt.nearD > 34 && towers.length < (isTouch ? 70 : 120) && hash2(pt.x, pt.z) < 0.4) towers.push(pt);
       else if (i % 3 === 0) trees.push(pt);
     });
-    // 依高度分四組，每組用預先縮放好 UV 的方塊，窗格才不會被拉長
-    const towerMat = new THREE.MeshStandardMaterial({ map: windowTex(K), emissiveMap: windowLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.85, roughness: 0.55, metalness: 0.15 });
-    towerMat.userData.day = 0.12; towerMat.userData.night = 1.4;
-    const BUCKET = [10, 18, 26, 37], bucketOf = (h) => BUCKET.findIndex((b) => h <= b + 2);
+    // 自由形體高樓：四個高度級距 × 兩種形體（扭轉擺動／起伏收分），共八個原型，再用實例化擺滿全城
+    const towerMat = new THREE.MeshStandardMaterial({ map: ribbonTex(K), emissiveMap: ribbonLitTex(K), emissive: '#ffffff', emissiveIntensity: 0.1, roughness: 0.45, metalness: 0.1 });
+    towerMat.userData.day = 0.06; towerMat.userData.night = 1.3;
+    const capMat = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
+    const BUCKET = [10, 18, 26, 37], bucketOf = (h) => { const b = BUCKET.findIndex((x) => h <= x + 2); return b < 0 ? 3 : b; };
+    const VARIANT = [
+      { taper: 0.2, bulge: 0.3, freq: 1.4, phase: 0.3, twist: 1.8, sway: 0.9, swayZ: 0.4, flare: 0.4 },
+      { taper: 0.4, bulge: 0.45, freq: 2.2, phase: 2.1, twist: -0.8, sway: 0.4, swayZ: 0.6, flare: 0.5, waist: 0.1 }
+    ];
     const specs = towers.map((pt, i) => ({ pt, i, w: 3 + hash2(i, 1) * 3, d: 3 + hash2(i, 2) * 3, h: 7 + hash2(i, 3) ** 2 * 30 * sstep(150, 60, Math.hypot(pt.x, pt.z)) }));
-    BUCKET.forEach((bh, bi) => {
-      const list = specs.filter((sp) => (bucketOf(sp.h) < 0 ? 3 : bucketOf(sp.h)) === bi);
+    BUCKET.forEach((bh, bi) => VARIANT.forEach((vr, vi) => {
+      const list = specs.filter((sp) => bucketOf(sp.h) === bi && sp.i % 2 === vi);
       if (!list.length) return;
-      const im = new THREE.InstancedMesh(boxGeo(K, 4.5, bh, 4.5, 2.6), towerMat, list.length);
+      const ft = fluidTower(K, bh, 16, 20, paramSection({ w: 2.25, d: 2.25, ...vr }), 2.4);
+      const body = new THREE.InstancedMesh(ft.geo, towerMat, list.length), cap = new THREE.InstancedMesh(ft.cap, capMat, list.length);
       list.forEach(({ pt, i, w, d, h }, k) => {
-        q.setFromAxisAngle(up, hash2(i, 4) * 1.5);
-        m4.compose(p.set(pt.x, pt.h + h / 2, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); im.setMatrixAt(k, m4);
-        im.setColorAt(k, col.set(['#ffffff', '#e6ecf5', '#f2efe8'][i % 3]));
+        q.setFromAxisAngle(up, hash2(i, 4) * 6.28);
+        m4.compose(p.set(pt.x, pt.h, pt.z), q, s.set(w / 4.5, h / bh, d / 4.5)); body.setMatrixAt(k, m4); cap.setMatrixAt(k, m4);
+        body.setColorAt(k, col.set(['#ffffff', '#e8eef6', '#f4f0f8'][i % 3]));
+        cap.setColorAt(k, col.set(NEON[i % NEON.length]));
+        colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.6 });
       });
-      im.castShadow = true; im.receiveShadow = true; scene.add(im);
-    });
-    const capM = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }), towers.length);
-    specs.forEach(({ pt, i, w, d, h }) => {
-      q.setFromAxisAngle(up, hash2(i, 4) * 1.5);
-      m4.compose(p.set(pt.x, pt.h + h + 0.15, pt.z), q, s.set(w + 0.1, 0.25, d + 0.1)); capM.setMatrixAt(i, m4);
-      capM.setColorAt(i, col.set(NEON[i % NEON.length]));
-      colliders.push({ x: pt.x, z: pt.z, r: Math.max(w, d) * 0.6 });
-    });
-    scene.add(capM);
+      body.castShadow = true; body.receiveShadow = true; scene.add(body, cap);
+    }));
     // 2. 霓虹樹：細樹幹＋發光的錐形樹冠
     const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.12, 0.2, 2, 5), new THREE.MeshStandardMaterial({ color: '#8a93a3', roughness: 0.5, metalness: 0.4 }), trees.length);
     const crownM = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 2.6, 6), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, toneMapped: false }), trees.length);
